@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pass the Atlas — doodle a world, survive it</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&family=Caveat:wght@500;700&family=Patrick+Hand&family=Permanent+Marker&family=Special+Elite&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="atlas.css" />
+</head>
+<body>
+  <div id="desk">
+    <div class="grain"></div>
+
+    <!-- TITLE -->
+    <section id="screen-title" class="screen active">
+      <div class="cover">
+        <div class="sheet wobble cover-left torn">
+          <div class="tape" style="width:110px;top:-6px;left:70px;transform:rotate(-8deg)"></div>
+          <div class="paperclip" style="top:-8px;right:40px"></div>
+          <p class="kicker">a tabletop doodle</p>
+          <h1 class="title">Pass the<br/>Atlas</h1>
+          <p class="tag">Take turns drawing a world. Then try not to die in it.</p>
+          <div class="actions">
+            <button class="btn wax" id="btn-new">Open a fresh atlas</button>
+            <button class="btn" id="btn-howto">How this works</button>
+            <button class="btn ghost" id="btn-solo">Solo practice map</button>
+          </div>
+          <p class="margin-note" style="position:absolute;bottom:36px;left:40px">for 1–4 friends, one keyboard, several bad ideas</p>
+        </div>
+        <div class="sheet wobble cover-right">
+          <div class="tape mint" style="width:90px;top:-8px;right:50px;transform:rotate(12deg)"></div>
+          <div class="stain" style="right:20px;bottom:30px"></div>
+          <p class="kicker">contents</p>
+          <ul class="toc">
+            <li><span>I. Land — grass, water, lava, ice</span><span class="pg">03</span></li>
+            <li><span>II. Fixtures — doors, chests, portals</span><span class="pg">11</span></li>
+            <li><span>III. Life — slimes, knights, treasure</span><span class="pg">19</span></li>
+            <li><span>IV. The expedition itself</span><span class="pg">27</span></li>
+          </ul>
+          <p class="blurb" style="margin-top:28px">Each cartographer gets a bottle of ink. When it runs dry — or when mischief is complete — you pass the pencil. The atlas remembers who drew every scribble.</p>
+          <p class="margin-note blue" style="margin-top:24px">margin note: all maps are lies we agree to walk on.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW TO -->
+    <section id="screen-howto" class="screen">
+      <div class="sheet wobble stack">
+        <div class="tape gold" style="width:130px;top:-6px;left:40%;transform:rotate(-4deg)"></div>
+        <h2>Three chapters, then blood.</h2>
+        <p class="blurb">Hot-seat. Pass the machine. Do not “help” during someone else’s turn unless they ask. Helping is how forests appear inside lava.</p>
+        <div class="cards">
+          <article class="card">
+            <div class="num">CHAPTER I</div>
+            <h3>Draw the land</h3>
+            <p>Stamp grass, rivers, ice sheets, pits and magma. Paper itself is walkable. Water slows you. Lava bites. Pits are rude.</p>
+          </article>
+          <article class="card">
+            <div class="num">CHAPTER II</div>
+            <h3>Build the nonsense</h3>
+            <p>Walls, locked doors, bridges over water, bounce pads, conveyor belts, campfire checkpoints, paired portals, signs with your handwriting.</p>
+          </article>
+          <article class="card">
+            <div class="num">CHAPTER III</div>
+            <h3>Stock the bestiary</h3>
+            <p>Drop slimes, bats, charging knights, mimic chests. Sprinkle coins, keys, hearts. Then someone has to walk through it.</p>
+          </article>
+        </div>
+        <div class="foot">
+          <button class="btn ghost" id="howto-back">back</button>
+          <button class="btn wax" id="howto-go">I brought a pencil</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETUP -->
+    <section id="screen-setup" class="screen">
+      <div class="sheet wobble stack">
+        <h2>Who is holding the pencil?</h2>
+        <div class="setup-grid">
+          <div>
+            <div class="players" id="player-list"></div>
+            <button class="btn small" id="add-player" style="margin-top:10px">+ another friend</button>
+          </div>
+          <div class="opts">
+            <h3>Atlas size</h3>
+            <div class="opt-row" id="size-opts"></div>
+            <h3>Expedition</h3>
+            <div class="opt-row" id="mode-opts"></div>
+            <h3>Turn clock</h3>
+            <div class="opt-row" id="time-opts"></div>
+            <p class="tiny">Import a folded atlas</p>
+            <input id="import-code" type="text" placeholder="paste a share code" style="width:100%;background:#f8efd6;border:2px solid var(--ink);padding:6px 8px;font-size:1rem" />
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn ghost" id="setup-back">back</button>
+          <button class="btn wax" id="setup-go">Begin chapter I</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASS THE PENCIL -->
+    <section id="screen-pass" class="screen">
+      <div class="sheet wobble passcard">
+        <div class="tape" style="width:160px;top:-8px;left:42%;transform:rotate(-7deg)"></div>
+        <p class="kicker" id="pass-kicker">CHAPTER I · LAND</p>
+        <h2 id="pass-title">Hand the pencil to Maple</h2>
+        <canvas class="portrait" id="pass-portrait" width="140" height="140"></canvas>
+        <p class="tag" id="pass-sub" style="max-width:28ch">You have 16 drops of ink. Make a place worth surviving.</p>
+        <button class="btn wax" id="pass-go">I have the pencil</button>
+      </div>
+    </section>
+
+    <!-- EDITOR -->
+    <section id="screen-editor" class="screen">
+      <aside class="sheet wobble panel" style="transform:rotate(-0.5deg)">
+        <div class="chapter-label" id="ed-chapter">CHAPTER I · LAND</div>
+        <h3 id="ed-toolname">Grass</h3>
+        <p class="tiny" id="ed-tooldesc">Walkable meadow. Cheap ink.</p>
+        <div class="palette" id="palette"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn small" id="btn-erase">eraser</button>
+          <button class="btn small" id="btn-undo">undo</button>
+          <button class="btn small" id="btn-grid">grid</button>
+        </div>
+      </aside>
+
+      <div class="sheet wobble" id="mapwrap" style="transform:rotate(0.2deg)">
+        <div class="tape mint" style="width:90px;top:-6px;left:24px;transform:rotate(-9deg)"></div>
+        <div id="mapstage">
+          <canvas id="game"></canvas>
+        </div>
+        <div class="hud-strip">
+          <div class="inkwell">
+            <span>ink</span>
+            <div class="inkbar"><i id="inkfill"></i></div>
+            <span id="inknum">16</span>
+          </div>
+          <span id="turn-clock" class="tiny"></span>
+          <button class="btn small wax" id="btn-pass">Pass the pencil</button>
+        </div>
+      </div>
+
+      <aside class="sheet wobble panel" style="transform:rotate(0.7deg)">
+        <h3>Cartographers</h3>
+        <div class="roster" id="roster"></div>
+        <p class="tiny legend" id="ed-hint" style="margin-top:12px">Left drag stamps. Right-drag erases. Wheel zooms. Space-drag pans. Z undoes.</p>
+        <button class="btn small" id="btn-export" style="margin-top:10px">copy share code</button>
+        <button class="btn small ghost" id="btn-playtest">sneak a play</button>
+      </aside>
+    </section>
+
+    <!-- PLAY -->
+    <section id="screen-play" class="screen">
+      <div class="sheet wobble" id="playstage" style="height:calc(100% - 48px)">
+        <canvas id="play"></canvas>
+        <div class="play-hud">
+          <div class="sticky" id="hud-hearts">♥ ♥ ♥</div>
+          <div class="sticky mint" id="hud-stats">coins 0 · keys 0</div>
+          <div class="sticky pink" id="hud-who">Maple</div>
+        </div>
+        <div class="touchpad">
+          <div class="pad">
+            <span></span><button data-dir="up">▲</button><span></span>
+            <button data-dir="left">◀</button><span></span><button data-dir="right">▶</button>
+            <span></span><button data-dir="down">▼</button><span></span>
+          </div>
+          <div class="act" style="display:flex;gap:8px;align-items:flex-end">
+            <button id="touch-atk">slash</button>
+            <button id="touch-dash">dash</button>
+            <button id="touch-use">use</button>
+          </div>
+        </div>
+      </div>
+      <div class="play-foot">
+        <span class="tiny" id="play-obj">Reach an exit. Campfires are checkpoints.</span>
+        <button class="btn small" id="btn-pause">pause</button>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="screen-results" class="screen">
+      <div class="sheet wobble cork">
+        <div class="tape" style="width:120px;top:-6px;left:30px;transform:rotate(-8deg)"></div>
+        <p class="kicker">pinned to the cork</p>
+        <h2 id="res-title">The atlas holds.</h2>
+        <p class="star-sticker" id="res-stamp">★ SURVIVED</p>
+        <div id="res-board"></div>
+        <div class="foot" style="margin-top:22px">
+          <button class="btn" id="res-again">run it again</button>
+          <button class="btn" id="res-edit">keep doodling</button>
+          <button class="btn wax" id="res-new">new atlas</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="modal-back" id="modal">
+      <div class="modal sheet">
+        <h3 id="modal-title">A sign</h3>
+        <p id="modal-body" class="tiny"></p>
+        <input id="modal-input" maxlength="80" />
+        <div class="row">
+          <button class="btn small ghost" id="modal-cancel">nevermind</button>
+          <button class="btn small wax" id="modal-ok">ink it</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-back" id="pause">
+      <div class="modal sheet">
+        <h3>Pencil down</h3>
+        <div class="pause-list">
+          <button class="btn" id="pause-resume">keep exploring</button>
+          <button class="btn" id="pause-restart">restart this run</button>
+          <button class="btn" id="pause-edit">back to the atlas</button>
+          <button class="btn ghost" id="pause-quit">abandon the table</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+  <script src="atlas.js"></script>
+</body>
+</html>
