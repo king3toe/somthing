@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omni Router Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+  <div class="max-w-6xl mx-auto p-6">
+    <header class="flex justify-between items-center mb-10 bg-white p-6 rounded-lg shadow-sm">
+      <h1 class="text-3xl font-bold text-indigo-600">Omni Router</h1>
+      <div class="text-sm text-gray-500">Local AI & Tool Gateway</div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Unified Keys -->
+      <section class="bg-white p-6 rounded-lg shadow-sm">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">Your Unified Keys</h2>
+        <p class="text-sm text-gray-600 mb-4">Use this key in your apps (Base URL: http://localhost:3000/v1)</p>
+        <div id="unified-keys-list" class="space-y-2 mb-4"></div>
+        <button onclick="createUnifiedKey()" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700">Generate New Master Key</button>
+      </section>
+
+      <!-- Provider Configs -->
+      <section class="bg-white p-6 rounded-lg shadow-sm">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">AI Providers</h2>
+        <form id="provider-form" class="space-y-3" onsubmit="saveProvider(event)">
+          <select id="provider-name" class="w-full p-2 border rounded" required>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+          <input type="password" id="provider-key" class="w-full p-2 border rounded" placeholder="API Key" required>
+          <input type="text" id="provider-url" class="w-full p-2 border rounded" placeholder="Base URL (Optional)">
+          <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Save Provider</button>
+        </form>
+      </section>
+
+      <!-- Tool Configs -->
+      <section class="bg-white p-6 rounded-lg shadow-sm">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">General Tool APIs</h2>
+        <form id="tool-form" class="space-y-3" onsubmit="saveTool(event)">
+          <input type="text" id="tool-name" class="w-full p-2 border rounded" placeholder="Tool Name (e.g., get_weather)" required>
+          <input type="text" id="tool-url" class="w-full p-2 border rounded" placeholder="API Endpoint URL" required>
+          <input type="password" id="tool-key" class="w-full p-2 border rounded" placeholder="API Key (Optional)">
+          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">Add Tool</button>
+        </form>
+      </section>
+
+      <!-- Logs / Stats placeholder -->
+      <section class="bg-white p-6 rounded-lg shadow-sm">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">System Status</h2>
+        <div class="text-green-600 font-mono text-sm p-4 bg-gray-50 rounded">Router is running efficiently on port 3000. Memory interceptors active. Tool registry online.</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    async function loadKeys() {
+      const res = await fetch('/api/keys');
+      const keys = await res.json();
+      document.getElementById('unified-keys-list').innerHTML = keys.map(k =>
+        `<div class="p-3 bg-gray-50 border rounded font-mono text-xs flex justify-between">
+          <span>${k.key}</span>
+          <span class="text-gray-400">${k.name}</span>
+        </div>`
+      ).join('');
+    }
+
+    async function createUnifiedKey() {
+      const name = prompt('Name for this key (e.g., Cursor, VSCode):');
+      if (!name) return;
+      await fetch('/api/keys', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name })
+      });
+      loadKeys();
+    }
+
+    async function saveProvider(e) {
+      e.preventDefault();
+      await fetch('/api/providers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          provider_name: document.getElementById('provider-name').value,
+          api_key: document.getElementById('provider-key').value,
+          base_url: document.getElementById('provider-url').value,
+        })
+      });
+      alert('Provider saved!');
+      e.target.reset();
+    }
+
+    async function saveTool(e) {
+      e.preventDefault();
+      await fetch('/api/tools', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          tool_name: document.getElementById('tool-name').value,
+          api_key: document.getElementById('tool-key').value,
+          base_url: document.getElementById('tool-url').value,
+        })
+      });
+      alert('Tool saved!');
+      e.target.reset();
+    }
+
+    // Initial load
+    loadKeys();
+  </script>
+</body>
+</html>
