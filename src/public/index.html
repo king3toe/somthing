@@ -6,9 +6,525 @@
   <title>everyRoute - Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bgMain: '#141414',
+            bgSidebar: '#1b1b1b',
+            bgCard: '#1f1f1f',
+            bgInput: '#2a2a2a',
+            bgHover: '#2d2d2d',
+            accentOrange: '#ff6622',
+            textMain: '#e0e0e0',
+            textMuted: '#888888',
+            borderDark: '#303030'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #141414; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    .nav-item { color: #888888; border-radius: 0.5rem; transition: all 0.2s; }
+    .nav-item i { color: #888888; }
+    .nav-item.active { background-color: rgba(255, 102, 34, 0.1); color: #ff6622; }
+    .nav-item.active i { color: #ff6622; }
+    .nav-item:hover:not(.active) { background-color: #2d2d2d; color: #e0e0e0; }
+
+    .section-content { display: none; }
+    .section-content.active { display: block; }
+  </style>
+</head>
+<body class="h-screen flex overflow-hidden selection:bg-accentOrange selection:text-white text-sm">
+
+  <!-- Sidebar -->
+  <aside class="w-[260px] bg-bgSidebar border-r border-borderDark flex flex-col h-full shrink-0">
+    <!-- Logo area -->
+    <div class="p-5 flex items-center gap-3">
+      <div class="w-10 h-10 bg-accentOrange rounded-xl flex items-center justify-center shrink-0">
+        <i data-lucide="network" class="text-white w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base text-white">everyRoute Proxy</h1>
+        <p class="text-xs text-textMuted mt-0.5">v0.5.81</p>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto font-medium">
+
+      <button onclick="switchTab('endpoint')" id="nav-endpoint" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_endpoint">
+        <i data-lucide="gem" class="w-4 h-4"></i> Endpoint & Key
+      </button>
+      <button onclick="switchTab('providers')" id="nav-providers" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_providers">
+        <i data-lucide="server" class="w-4 h-4"></i> Providers
+      </button>
+      <button onclick="switchTab('combo')" id="nav-combo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_combo">
+        <i data-lucide="layers" class="w-4 h-4"></i> Combo & Vision Adapter
+      </button>
+      <button onclick="switchTab('usage')" id="nav-usage" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_usage">
+        <i data-lucide="bar-chart-2" class="w-4 h-4"></i> Usage
+      </button>
+      <button onclick="switchTab('quota')" id="nav-quota" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_quota">
+        <i data-lucide="pie-chart" class="w-4 h-4"></i> Quota Tracker
+      </button>
+      <button onclick="switchTab('token')" id="nav-token" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_token">
+        <i data-lucide="shield" class="w-4 h-4"></i> Token Saver
+      </button>
+      <button onclick="switchTab('cli')" id="nav-cli" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_cli">
+        <i data-lucide="terminal" class="w-4 h-4"></i> CLI Tools
+      </button>
+
+      <div class="pt-4 pb-1 px-3 text-xs font-semibold text-textMuted tracking-wider" data-i18n="system">SYSTEM</div>
+
+      <button onclick="switchTab('media')" id="nav-media" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_media">
+        <i data-lucide="image" class="w-4 h-4"></i> Media Providers
+      </button>
+      <button onclick="switchTab('proxy')" id="nav-proxy" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_proxy">
+        <i data-lucide="network" class="w-4 h-4"></i> Proxy Pools
+      </button>
+      <button onclick="switchTab('skills')" id="nav-skills" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_skills">
+        <i data-lucide="zap" class="w-4 h-4"></i> Skills (Tools)
+      </button>
+      <button onclick="switchTab('console')" id="nav-console" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_console">
+        <i data-lucide="monitor" class="w-4 h-4"></i> Console Log
+      </button>
+      <button onclick="switchTab('appearance')" id="nav-appearance" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_appearance">
+        <i data-lucide="palette" class="w-4 h-4"></i> Appearance
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 overflow-y-auto bg-bgMain flex flex-col relative">
+
+    <!-- Top Header -->
+    <header class="h-16 border-b border-borderDark flex items-center justify-between px-8 bg-bgMain sticky top-0 z-10">
+      <div>
+        <h1 id="header-title" class="text-xl font-bold text-white tracking-wide">Endpoint</h1>
+        <p id="header-subtitle" class="text-xs text-textMuted mt-0.5">API endpoint configuration</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <select id="lang-select" onchange="setLanguage(this.value)" class="bg-bgInput border border-borderDark text-textMuted text-xs rounded-md px-2 py-1 outline-none">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="zh">中文</option>
+        </select>
+        <button class="flex items-center gap-2 border border-pink-500/30 text-pink-400 px-3 py-1.5 rounded-md hover:bg-pink-500/10 transition">
+          <i data-lucide="heart" class="w-4 h-4"></i> <span data-i18n="donate">Donate</span>
+        </button>
+        <i data-lucide="sun" class="w-5 h-5 text-textMuted cursor-pointer hover:text-white"></i>
+        <i data-lucide="layout-grid" class="w-5 h-5 text-textMuted cursor-pointer hover:text-white"></i>
+      </div>
+    </header>
+
+    <!-- Background Grid Pattern -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(#1f1f1f 1px, transparent 1px), linear-gradient(90deg, #1f1f1f 1px, transparent 1px); background-size: 50px 50px; opacity: 0.3;"></div>
+
+    <div class="p-8 max-w-5xl space-y-6 pb-20 relative z-0 w-full">
+
+      <!-- ================= SECTION: ENDPOINT ================= -->
+      <div id="section-endpoint" class="section-content active space-y-6">
+
+        <!-- API Endpoint Card -->
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 flex items-center gap-3">
+            <i data-lucide="gem" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">API Endpoint</h2>
+          </div>
+          <div class="px-6 pb-6 space-y-5">
+            <div class="flex items-center gap-4">
+              <span class="text-xs font-mono text-textMuted bg-bgInput px-3 py-1 rounded w-20 text-center">Local</span>
+              <div class="flex-1 bg-bgInput border border-borderDark rounded-lg px-4 py-2.5 font-mono flex justify-between items-center group">
+                <span class="text-textMain">http://localhost:3000/v1</span>
+                <button class="text-textMuted hover:text-white opacity-0 group-hover:opacity-100 transition" title="Copy">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <span class="text-xs font-mono text-accentOrange bg-accentOrange/10 px-3 py-1 rounded w-20 text-center">Tunnel</span>
+              <div class="flex-1 bg-bgInput border border-accentOrange/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                 <i data-lucide="loader" class="w-4 h-4 text-accentOrange animate-spin"></i>
+                 <span class="text-accentOrange font-medium text-sm">Tunnel checking...</span>
+              </div>
+              <button class="text-red-500 hover:text-red-400 p-2 border border-red-500/20 rounded-lg hover:bg-red-500/10">
+                <i data-lucide="power" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <span class="text-xs font-mono text-textMuted bg-bgInput px-3 py-1 rounded w-20 text-center">Tailscale</span>
+              <button class="bg-[#4b4bdf] hover:bg-[#5c5ceb] text-white px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2">
+                <i data-lucide="globe" class="w-4 h-4"></i> Enable
+              </button>
+            </div>
+
+            <div class="bg-accentOrange/10 border border-accentOrange/30 rounded-lg p-4 flex items-center justify-between text-accentOrange">
+               <div class="flex items-center gap-2">
+                 <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                 <span>Require login is disabled — anyone can access your dashboard via tunnel.</span>
+               </div>
+               <a href="#" class="underline font-medium hover:text-orange-400">Enable</a>
+            </div>
+
+            <div class="flex items-center gap-3 pt-2">
+               <!-- Custom toggle switch -->
+               <div class="w-10 h-6 bg-accentOrange rounded-full flex items-center px-1 cursor-pointer">
+                 <div class="w-4 h-4 bg-white rounded-full translate-x-4"></div>
+               </div>
+               <span class="text-white font-medium">Allow dashboard access via tunnel</span>
+               <i data-lucide="help-circle" class="w-4 h-4 text-textMuted"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Keys Card -->
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="key" class="w-5 h-5 text-accentOrange"></i>
+              <h2 class="font-bold text-lg text-white">API Keys</h2>
+            </div>
+            <button onclick="createUnifiedKey()" class="bg-accentOrange hover:bg-[#ff7733] text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
+              <i data-lucide="plus" class="w-4 h-4"></i> Create Key
+            </button>
+          </div>
+
+          <div class="px-6 pb-2">
+            <div class="flex items-center justify-between mb-4">
+               <div>
+                 <h3 class="font-bold text-white text-base">Require API key</h3>
+                 <p class="text-textMuted text-sm">Requests without a valid key will be rejected</p>
+               </div>
+               <!-- Custom toggle switch on -->
+               <div class="w-10 h-6 bg-accentOrange rounded-full flex items-center px-1 cursor-pointer">
+                 <div class="w-4 h-4 bg-white rounded-full translate-x-4"></div>
+               </div>
+            </div>
+          </div>
+
+          <div class="px-6 pb-6 border-t border-borderDark pt-4 mt-2">
+            <div id="unified-keys-list" class="space-y-3">
+              <!-- Keys injected here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: PROVIDERS ================= -->
+      <div id="section-providers" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="server" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Add AI Provider</h2>
+          </div>
+          <div class="p-6">
+            <form id="provider-form" class="space-y-4 max-w-xl" onsubmit="saveProvider(event)">
+              <div>
+                <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Provider Type</label>
+                <select id="provider-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" required>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                </select>
+              </div>
+              <div>
+                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">API Key</label>
+                 <input type="password" id="provider-key" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="sk-..." required>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Base URL (Optional)</label>
+                <input type="text" id="provider-url" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="https://api.openai.com/v1">
+              </div>
+              <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
+                Save Configuration
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: COMBO ================= -->
+      <div id="section-combo" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="layers" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Combo & Vision Adapter</h2>
+          </div>
+          <div class="p-6">
+            <p class="text-sm text-textMuted mb-6 max-w-xl">Configure fallback models in case the primary provider is down or rate-limited.</p>
+            <form id="combo-form" class="space-y-4 max-w-xl" onsubmit="saveCombo(event)">
+              <div>
+                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Combo Name</label>
+                 <input type="text" id="combo-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="e.g., fallback-chain-1" required>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Primary Model</label>
+                  <input type="text" id="combo-primary" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="gpt-4o" required>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Fallback Model</label>
+                  <input type="text" id="combo-fallback" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="claude-3-opus" required>
+                </div>
+              </div>
+              <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
+                Save Combo Config
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: USAGE ================= -->
+      <div id="section-usage" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="bar-chart-2" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Usage Analytics</h2>
+          </div>
+          <div class="p-6">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-textMain border-collapse">
+                <thead>
+                  <tr class="border-b border-borderDark text-textMuted text-xs uppercase">
+                    <th class="py-3 px-4 font-semibold">Provider</th>
+                    <th class="py-3 px-4 font-semibold">Model</th>
+                    <th class="py-3 px-4 font-semibold">Prompt Tokens</th>
+                    <th class="py-3 px-4 font-semibold">Completion Tokens</th>
+                    <th class="py-3 px-4 font-semibold text-right">Cost (USD)</th>
+                  </tr>
+                </thead>
+                <tbody id="usage-table-body" class="divide-y divide-borderDark">
+                   <!-- injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: QUOTA ================= -->
+      <div id="section-quota" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="pie-chart" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Quota Tracker</h2>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Enable Quota Tracker</h3>
+                <p class="text-sm text-textMuted mt-1">Limit spending per key.</p>
+              </div>
+              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('quota', this)">
+                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: TOKEN ================= -->
+      <div id="section-token" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="shield" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Token Saver</h2>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Enable Token Saver</h3>
+                <p class="text-sm text-textMuted mt-1">Cache semantic responses to reduce costs.</p>
+              </div>
+              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('token', this)">
+                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: CLI ================= -->
+      <div id="section-cli" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="terminal" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">CLI Tools</h2>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Enable CLI Tools</h3>
+                <p class="text-sm text-textMuted mt-1">Enable command-line access via tunnel.</p>
+              </div>
+              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('cli', this)">
+                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: MEDIA ================= -->
+      <div id="section-media" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="image" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Media Providers</h2>
+          </div>
+          <div class="p-6">
+            <p class="text-sm text-textMuted mb-6 max-w-xl">Configure API keys for image generation models like Midjourney or DALL-E.</p>
+            <form id="media-form" class="space-y-4 max-w-xl" onsubmit="saveMedia(event)">
+              <div>
+                <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Provider Name</label>
+                <select id="media-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" required>
+                  <option value="dalle">OpenAI DALL-E 3</option>
+                  <option value="midjourney">Midjourney (via Proxy)</option>
+                  <option value="stable-diffusion">Stable Diffusion API</option>
+                </select>
+              </div>
+              <div>
+                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">API Key</label>
+                 <input type="password" id="media-key" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="Key or Token" required>
+              </div>
+              <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
+                Save Media Provider
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: PROXY ================= -->
+      <div id="section-proxy" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="network" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Proxy Pools</h2>
+          </div>
+          <div class="p-6">
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Enable Proxy Pools</h3>
+                <p class="text-sm text-textMuted mt-1">Rotate outbound IPs for specific requests.</p>
+              </div>
+              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('proxy', this)">
+                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: SKILLS ================= -->
+      <div id="section-skills" class="section-content space-y-6">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="zap" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Register Skill (Tool API)</h2>
+          </div>
+          <div class="p-6">
+            <p class="text-sm text-textMuted mb-6 max-w-xl">Register external APIs here. The router will intercept AI intent and execute these automatically when requested by any model.</p>
+            <form id="tool-form" class="space-y-4 max-w-xl" onsubmit="saveTool(event)">
+              <div>
+                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Tool Name (Function Name)</label>
+                 <input type="text" id="tool-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="e.g., get_weather" required>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">API Endpoint URL</label>
+                <input type="text" id="tool-url" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="https://api.weather.com/v1/..." required>
+              </div>
+              <div>
+                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Authentication Key (Optional)</label>
+                 <input type="password" id="tool-key" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="Bearer token or raw key">
+              </div>
+              <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
+                Register Tool
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: CONSOLE ================= -->
+      <div id="section-console" class="section-content space-y-6">
+         <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-4 border-b border-borderDark flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <i data-lucide="monitor" class="w-5 h-5 text-accentOrange"></i>
+              <h2 class="font-bold text-lg text-white">Console Log</h2>
+            </div>
+            <button class="text-textMuted hover:text-white"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </div>
+          <div class="p-4">
+            <div class="bg-[#0c0c0c] border border-borderDark rounded-lg p-4 font-mono text-xs text-green-500 h-64 overflow-y-auto">
+              <p>[INFO] Router initialized on port 3000</p>
+              <p>[INFO] SQLite DB connected successfully</p>
+              <p>[INFO] Tools registry loaded</p>
+              <p>[INFO] Cross-session memory middleware active</p>
+              <p class="mt-2 text-textMuted">> Waiting for incoming requests...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: APPEARANCE ================= -->
+      <div id="section-appearance" class="section-content space-y-6">
+         <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
+            <i data-lucide="palette" class="w-5 h-5 text-accentOrange"></i>
+            <h2 class="font-bold text-lg text-white">Theme & Colors</h2>
+          </div>
+          <div class="p-6 space-y-6">
+            <p class="text-sm text-textMuted max-w-xl">Customize the dashboard colors. Changes are saved automatically and applied on reload.</p>
+
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Main Background</h3>
+                <p class="text-xs text-textMuted mt-1">The primary background color of the dashboard.</p>
+              </div>
+              <input type="color" id="color-bgMain" value="#141414" class="w-10 h-10 rounded cursor-pointer border-0 p-0" onchange="saveColor('bgMain', this)">
+            </div>
+
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Cards & Sidebar</h3>
+                <p class="text-xs text-textMuted mt-1">The background color for panels, cards, and navigation.</p>
+              </div>
+              <input type="color" id="color-bgCard" value="#1f1f1f" class="w-10 h-10 rounded cursor-pointer border-0 p-0" onchange="saveColor('bgCard', this)">
+            </div>
+
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+              <div>
+                <h3 class="font-bold text-white">Accent Color</h3>
+                <p class="text-xs text-textMuted mt-1">The primary highlight color (buttons, active tabs, toggles).</p>
+              </div>
+              <input type="color" id="color-accentOrange" value="#ff6622" class="w-10 h-10 rounded cursor-pointer border-0 p-0" onchange="saveColor('accentOrange', this)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // Initialize Lucide icons
     lucide.createIcons();
 
+    // Sections configuration for dynamic titles
     const sections = {
       'endpoint': { title: 'Endpoint', sub: 'API endpoint configuration' },
       'providers': { title: 'Providers', sub: 'Configure upstream AI providers' },
@@ -24,6 +540,7 @@
       'appearance': { title: 'Appearance', sub: 'Customize dashboard colors' }
     };
 
+    // Tab switching logic
     function switchTab(tabId) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.getElementById('nav-' + tabId)?.classList.add('active');
@@ -36,6 +553,8 @@
         document.getElementById('header-subtitle').innerText = sections[tabId].sub;
       }
     }
+
+    // === API Interaction Functions ===
 
     async function loadKeys() {
       try {
@@ -123,6 +642,20 @@
       e.target.reset();
     }
 
+    async function saveMedia(e) {
+      e.preventDefault();
+      await fetch('/api/media', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          provider_name: document.getElementById('media-name').value,
+          api_key: document.getElementById('media-key').value
+        })
+      });
+      alert('Media Provider saved successfully!');
+      e.target.reset();
+    }
+
     async function loadUsage() {
       try {
         const res = await fetch('/api/usage');
@@ -197,12 +730,8 @@
       });
     }
 
-    // Color Customization Logic
+    // === Color Customization Logic ===
     function applyColor(cssVar, hexValue) {
-       // Tailwind arbitrary values don't update easily at runtime without rebuilding,
-       // but we can inject a style tag to override the classes if needed,
-       // or simply update CSS variables if we switch the config to use variables.
-       // For this simple implementation, we'll write a dynamic style block.
        let styleEl = document.getElementById('dynamic-theme');
        if (!styleEl) {
          styleEl = document.createElement('style');
@@ -210,7 +739,6 @@
          document.head.appendChild(styleEl);
        }
 
-       // Add the rule to the style block. We'll use CSS specificity to override Tailwind classes.
        let cssRules = styleEl.innerHTML;
 
        if (cssVar === 'bgMain') {
@@ -242,25 +770,90 @@
       });
     }
 
+    // === MULTILANGUAGE i18n ===
+    const translations = {
+      en: {
+        'nav_endpoint': 'Endpoint & Key',
+        'nav_providers': 'Providers',
+        'nav_combo': 'Combo & Vision Adapter',
+        'nav_usage': 'Usage',
+        'nav_quota': 'Quota Tracker',
+        'nav_token': 'Token Saver',
+        'nav_cli': 'CLI Tools',
+        'nav_media': 'Media Providers',
+        'nav_proxy': 'Proxy Pools',
+        'nav_skills': 'Skills (Tools)',
+        'nav_console': 'Console Log',
+        'nav_appearance': 'Appearance',
+        'system': 'SYSTEM',
+        'donate': 'Donate'
+      },
+      es: {
+        'nav_endpoint': 'Punto de Enlace y Clave',
+        'nav_providers': 'Proveedores',
+        'nav_combo': 'Adaptador de Combo y Visión',
+        'nav_usage': 'Uso',
+        'nav_quota': 'Rastreador de Cuota',
+        'nav_token': 'Ahorrador de Tokens',
+        'nav_cli': 'Herramientas CLI',
+        'nav_media': 'Proveedores de Medios',
+        'nav_proxy': 'Grupos de Proxy',
+        'nav_skills': 'Habilidades (Herramientas)',
+        'nav_console': 'Registro de Consola',
+        'nav_appearance': 'Apariencia',
+        'system': 'SISTEMA',
+        'donate': 'Donar'
+      },
+      zh: {
+        'nav_endpoint': '端点和密钥',
+        'nav_providers': '提供商',
+        'nav_combo': '组合和视觉适配器',
+        'nav_usage': '使用情况',
+        'nav_quota': '配额追踪器',
+        'nav_token': 'Token 节省器',
+        'nav_cli': 'CLI 工具',
+        'nav_media': '媒体提供商',
+        'nav_proxy': '代理池',
+        'nav_skills': '技能 (工具)',
+        'nav_console': '控制台日志',
+        'nav_appearance': '外观',
+        'system': '系统',
+        'donate': '捐赠'
+      }
+    };
 
-    async function saveMedia(e) {
-      e.preventDefault();
-      await fetch('/api/media', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          provider_name: document.getElementById('media-name').value,
-          api_key: document.getElementById('media-key').value
-        })
+    function setLanguage(lang) {
+      localStorage.setItem('everyRouteLang', lang);
+      const t = translations[lang] || translations['en'];
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) {
+          // If it has lucide icon child, preserve it
+          const icon = el.querySelector('i');
+          if (icon) {
+            el.innerHTML = '';
+            el.appendChild(icon);
+            el.appendChild(document.createTextNode(' ' + t[key]));
+          } else {
+            el.innerText = t[key];
+          }
+        }
       });
-      alert('Media Provider saved successfully!');
-      e.target.reset();
+      lucide.createIcons();
     }
 
-    // Call loaders
+    // === Initialization ===
     loadKeys();
     loadUsage();
     loadConfigs();
+
+    // Load saved language
+    const savedLang = localStorage.getItem('everyRouteLang') || 'en';
+    const selectEl = document.getElementById('lang-select');
+    if (selectEl) selectEl.value = savedLang;
+    setLanguage(savedLang);
+
   </script>
 </body>
 </html>
