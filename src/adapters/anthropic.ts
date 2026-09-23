@@ -4,13 +4,34 @@ export const handleAnthropic = async (providerConfig: any, body: any) => {
   const apiKey = providerConfig.api_key;
   const baseUrl = providerConfig.base_url || 'https://api.anthropic.com/v1';
 
-  // Basic translation from OpenAI format to Anthropic format
   let anthropicMessages = [];
   let systemPrompt = "";
 
   for (const msg of body.messages) {
     if (msg.role === 'system') {
       systemPrompt = msg.content;
+    } else if (msg.role === 'tool') {
+      anthropicMessages.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: msg.tool_call_id,
+            content: msg.content
+          }
+        ]
+      });
+    } else if (msg.role === 'assistant' && msg.tool_calls) {
+       let content: any[] = msg.content ? [{ type: 'text', text: msg.content }] : [];
+       for (const tool of msg.tool_calls) {
+         content.push({
+           type: 'tool_use',
+           id: tool.id,
+           name: tool.function.name,
+           input: JSON.parse(tool.function.arguments || '{}')
+         });
+       }
+       anthropicMessages.push({ role: 'assistant', content });
     } else {
       anthropicMessages.push({
         role: msg.role === 'user' ? 'user' : 'assistant',
@@ -29,6 +50,15 @@ export const handleAnthropic = async (providerConfig: any, body: any) => {
     anthropicBody.system = systemPrompt;
   }
 
+  // Translate OpenAI tools to Anthropic format
+  if (body.tools && body.tools.length > 0) {
+    anthropicBody.tools = body.tools.map((t: any) => ({
+      name: t.function.name,
+      description: t.function.description || '',
+      input_schema: t.function.parameters || { type: 'object', properties: {} }
+    }));
+  }
+
   try {
     const response = await axios.post(`${baseUrl}/messages`, anthropicBody, {
       headers: {
@@ -38,28 +68,55 @@ export const handleAnthropic = async (providerConfig: any, body: any) => {
       }
     });
 
-    // Translate back to OpenAI format
-    return {
-      id: response.data.id,
+    const anthropicResponse = response.data;
+
+    // Translate response back to OpenAI format
+    let finalContent = null;
+    let toolCalls = [];
+
+    for (const block of anthropicResponse.content) {
+      if (block.type === 'text') {
+        finalContent = block.text;
+      } else if (block.type === 'tool_use') {
+        toolCalls.push({
+          id: block.id,
+          type: 'function',
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.input)
+          }
+        });
+      }
+    }
+
+    const openaiResponse: any = {
+      id: anthropicResponse.id,
       object: 'chat.completion',
       created: Math.floor(Date.now() / 1000),
-      model: response.data.model,
+      model: anthropicResponse.model,
       choices: [
         {
           index: 0,
           message: {
-            role: 'assistant',
-            content: response.data.content[0].text
+             role: 'assistant',
+             content: finalContent
           },
-          finish_reason: 'stop'
+          finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop'
         }
       ],
       usage: {
-        prompt_tokens: response.data.usage.input_tokens,
-        completion_tokens: response.data.usage.output_tokens,
-        total_tokens: response.data.usage.input_tokens + response.data.usage.output_tokens
+        prompt_tokens: anthropicResponse.usage?.input_tokens || 0,
+        completion_tokens: anthropicResponse.usage?.output_tokens || 0,
+        total_tokens: (anthropicResponse.usage?.input_tokens || 0) + (anthropicResponse.usage?.output_tokens || 0)
       }
     };
+
+    if (toolCalls.length > 0) {
+      openaiResponse.choices[0].message.tool_calls = toolCalls;
+    }
+
+    return openaiResponse;
+
   } catch (error: any) {
     if (error.response) {
       throw new Error(`Anthropic API error: ${JSON.stringify(error.response.data)}`);

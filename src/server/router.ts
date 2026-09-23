@@ -6,7 +6,8 @@ import { withToolInterceptor } from '../middleware/tools';
 import { injectMemory, saveMemory } from '../middleware/memory';
 
 export default async function routerRoutes(fastify: FastifyInstance) {
-  fastify.post('/v1/chat/completions', async (request, reply) => {
+  // Wildcard route to handle /v1/chat/completions, /v1/models, etc.
+  fastify.all('/v1/*', async (request, reply) => {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return reply.status(401).send({ error: 'Missing or invalid Authorization header' });
@@ -19,14 +20,20 @@ export default async function routerRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid unified API key' });
     }
 
-    const body: any = request.body;
+    // Pass through for non-POST requests (like GET /v1/models)
+    if (request.method !== 'POST') {
+       return reply.status(200).send({ data: [{ id: 'gpt-4o', object: 'model' }, { id: 'claude-3-opus', object: 'model' }] });
+    }
+
+    const body: any = request.body || {};
     const model = body.model || 'gpt-3.5-turbo';
+    const isChatEndpoint = request.url.includes('/chat/completions');
 
-    // Check for custom session ID header for memory tracking
+    // Memory only applies to chat endpoints
     const sessionId = request.headers['x-session-id'] as string | undefined;
-
-    // Inject memory into the messages
-    body.messages = injectMemory(sessionId, body.messages);
+    if (isChatEndpoint && body.messages) {
+      body.messages = injectMemory(sessionId, body.messages);
+    }
 
     let targetProvider = 'openai';
     if (model.includes('claude') || model.startsWith('anthropic:')) {
@@ -48,12 +55,37 @@ export default async function routerRoutes(fastify: FastifyInstance) {
         }
       };
 
-      // Wrap the AI execution in the Tool Interceptor
-      const finalResult = await withToolInterceptor(executeAI, body);
+      let finalResult;
 
-      // Save memory of the interaction
-      if (finalResult && finalResult.choices && finalResult.choices[0]) {
-        saveMemory(sessionId, request.body as any, finalResult.choices[0].message);
+      // Only apply tool interception to chat completions
+      if (isChatEndpoint) {
+        // Automatically inject registered tools into the body so the AI knows about them
+        const tools = db.prepare('SELECT * FROM ToolConfigs').all() as any[];
+        if (tools.length > 0) {
+          body.tools = body.tools || [];
+          for (const tool of tools) {
+            // Simple generic schema injection (can be expanded via DB config)
+            if (!body.tools.find((t: any) => t.function?.name === tool.tool_name)) {
+               body.tools.push({
+                 type: 'function',
+                 function: {
+                   name: tool.tool_name,
+                   description: `Executes the ${tool.tool_name} tool API.`,
+                   parameters: { type: 'object', properties: {} } // Flexible generic schema
+                 }
+               });
+            }
+          }
+        }
+
+        finalResult = await withToolInterceptor(executeAI, body);
+
+        if (finalResult && finalResult.choices && finalResult.choices[0]) {
+          saveMemory(sessionId, request.body as any, finalResult.choices[0].message);
+        }
+      } else {
+        // Direct execution for things like /v1/embeddings
+        finalResult = await executeAI(body);
       }
 
       return finalResult;
