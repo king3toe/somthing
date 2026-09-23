@@ -98,12 +98,6 @@
       <button onclick="switchTab('console')" id="nav-console" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left">
         <i data-lucide="monitor" class="w-4 h-4"></i> Console Log
       </button>
-      <button onclick="switchTab('remote')" id="nav-remote" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left">
-        <i data-lucide="monitor-smartphone" class="w-4 h-4"></i> 9Remote
-      </button>
-      <button onclick="switchTab('english')" id="nav-english" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left">
-        <i data-lucide="languages" class="w-4 h-4"></i> 9English
-      </button>
     </nav>
   </aside>
 
@@ -471,44 +465,12 @@
       </div>
 
 
-      <div id="section-remote" class="section-content space-y-6">
-        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
-          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
-            <i data-lucide="monitor-smartphone" class="w-5 h-5 text-accentOrange"></i>
-            <h2 class="font-bold text-lg text-white">9Remote</h2>
-          </div>
-          <div class="p-6">
-            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
-              <div>
-                <h3 class="font-bold text-white">Enable 9Remote</h3>
-                <p class="text-sm text-textMuted mt-1">Allow remote dashboard administration.</p>
-              </div>
-              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('remote', this)">
-                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 
 
-      <div id="section-english" class="section-content space-y-6">
-        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
-          <div class="px-6 py-5 border-b border-borderDark flex items-center gap-3">
-            <i data-lucide="languages" class="w-5 h-5 text-accentOrange"></i>
-            <h2 class="font-bold text-lg text-white">9English</h2>
-          </div>
-          <div class="p-6">
-            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
-              <div>
-                <h3 class="font-bold text-white">Enable 9English</h3>
-                <p class="text-sm text-textMuted mt-1">Auto-translate non-English inputs before sending to AI.</p>
-              </div>
-              <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('english', this)">
-                 <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -531,8 +493,6 @@
       'proxy': { title: 'Proxy Pools', sub: 'IP rotation configuration' },
       'skills': { title: 'Skills (Tools)', sub: 'Register external APIs for the AI' },
       'console': { title: 'Console Log', sub: 'Live system output' },
-      'remote': { title: '9Remote', sub: 'Remote access config' },
-      'english': { title: '9English', sub: 'Localization and translation' },
     };
 
     function switchTab(tabId) {
