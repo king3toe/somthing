@@ -23,12 +23,12 @@ export const resolveToolCall = async (toolCall: any) => {
   try {
     let result;
     if (toolName === 'get_weather') {
-      const location = (args as any).location;
+      const location = encodeURIComponent((args as any).location || '');
       result = await axios.get(`${baseUrl}?q=${location}&appid=${apiKey}&units=metric`);
       return JSON.stringify(result.data);
     }
     else if (toolName === 'search_youtube') {
-      const query = (args as any).query;
+      const query = encodeURIComponent((args as any).query || '');
       result = await axios.get(`${baseUrl}/search?part=snippet&q=${query}&key=${apiKey}`);
       return JSON.stringify(result.data.items);
     }
