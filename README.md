@@ -1,4 +1,4 @@
-# Omni Router
+# everyRoute
 
 A highly flexible local AI router and tool gateway.
 Consolidate APIs, register general APIs as AI tools, and enjoy local memory.

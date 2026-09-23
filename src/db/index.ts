@@ -30,7 +30,8 @@ export const initDb = () => {
     CREATE TABLE IF NOT EXISTS Combos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE NOT NULL,
-      rules_json TEXT NOT NULL
+      primary_model TEXT NOT NULL,
+      fallback_model TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS CostTracking (
@@ -41,8 +42,7 @@ export const initDb = () => {
       prompt_tokens INTEGER,
       completion_tokens INTEGER,
       cost_usd REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (unified_key_id) REFERENCES UnifiedKeys(id)
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS Memory (
@@ -52,8 +52,28 @@ export const initDb = () => {
       content TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS SystemConfigs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      config_key TEXT UNIQUE NOT NULL,
+      config_value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS MediaProviders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_name TEXT UNIQUE NOT NULL,
+      api_key TEXT NOT NULL
+    );
   `);
-  console.log("Database initialized and tables created (if they didn't exist).");
+
+  // Seed some dummy usage data for the dashboard if empty
+  const count = db.prepare('SELECT count(*) as c FROM CostTracking').get() as {c: number};
+  if (count.c === 0) {
+    db.prepare('INSERT INTO CostTracking (provider, model, prompt_tokens, completion_tokens, cost_usd) VALUES (?, ?, ?, ?, ?)').run('openai', 'gpt-4o', 1200, 300, 0.015);
+    db.prepare('INSERT INTO CostTracking (provider, model, prompt_tokens, completion_tokens, cost_usd) VALUES (?, ?, ?, ?, ?)').run('anthropic', 'claude-3-opus', 4000, 1500, 0.12);
+  }
+
+  console.log("Database initialized and tables created.");
 };
 
 export default db;
