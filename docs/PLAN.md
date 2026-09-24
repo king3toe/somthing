@@ -1,4 +1,4 @@
-# EveryRoute - Omni-Router Architecture & Plan
+# EveryRoute - Architecture & Plan
 
 ## Overview
 EveryRoute is a local-first, scalable API router designed to consolidate AI models and general-purpose APIs into a single, unified endpoint. It allows users to use one master API key to access multiple LLMs (OpenAI, Anthropic, etc.) and gives those LLMs automatic access to external tools (Weather, YouTube, etc.) via function calling.
