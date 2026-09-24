@@ -4,23 +4,31 @@ export const handleAnthropic = async (providerConfig: any, body: any) => {
   const apiKey = providerConfig.api_key;
   const baseUrl = providerConfig.base_url || 'https://api.anthropic.com/v1';
 
-  let anthropicMessages = [];
+  let anthropicMessages: any[] = [];
   let systemPrompt = "";
 
   for (const msg of body.messages) {
     if (msg.role === 'system') {
       systemPrompt = msg.content;
     } else if (msg.role === 'tool') {
-      anthropicMessages.push({
-        role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: msg.tool_call_id,
-            content: msg.content
-          }
-        ]
-      });
+      // Check if the previous message was also a tool result (or is already a bundled user tool result)
+      const lastMsg = anthropicMessages[anthropicMessages.length - 1];
+      const toolBlock = {
+        type: 'tool_result',
+        tool_use_id: msg.tool_call_id,
+        content: msg.content
+      };
+
+      if (lastMsg && lastMsg.role === 'user' && Array.isArray(lastMsg.content) && lastMsg.content.some((c: any) => c.type === 'tool_result')) {
+        // Bundle with existing parallel tool calls
+        lastMsg.content.push(toolBlock);
+      } else {
+        // Create new user block for tool results
+        anthropicMessages.push({
+          role: 'user',
+          content: [toolBlock]
+        });
+      }
     } else if (msg.role === 'assistant' && msg.tool_calls) {
        let content: any[] = msg.content ? [{ type: 'text', text: msg.content }] : [];
        for (const tool of msg.tool_calls) {

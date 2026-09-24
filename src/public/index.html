@@ -236,6 +236,11 @@
                 <select id="provider-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" required>
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
+                  <option value="google">Google (Gemini)</option>
+                  <option value="groq">Groq</option>
+                  <option value="perplexity">Perplexity</option>
+                  <option value="xai">xAI (Grok)</option>
+                  <option value="ollama">Ollama (Local)</option>
                 </select>
               </div>
               <div>
@@ -250,6 +255,17 @@
                 Save Configuration
               </button>
             </form>
+          </div>
+        </div>
+
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden mt-6">
+          <div class="px-6 py-5 border-b border-borderDark">
+            <h3 class="font-bold text-white">Configured Providers</h3>
+          </div>
+          <div class="p-6">
+             <div id="providers-list" class="space-y-2">
+                <!-- Dynamic provider rows here -->
+             </div>
           </div>
         </div>
       </div>
@@ -282,6 +298,17 @@
                 Save Combo Config
               </button>
             </form>
+          </div>
+        </div>
+
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden mt-6">
+          <div class="px-6 py-5 border-b border-borderDark">
+            <h3 class="font-bold text-white">Configured Combos</h3>
+          </div>
+          <div class="p-6">
+             <div id="combos-list" class="space-y-2">
+                <!-- Dynamic combo rows here -->
+             </div>
           </div>
         </div>
       </div>
@@ -322,7 +349,7 @@
             <h2 class="font-bold text-lg text-white">Quota Tracker</h2>
           </div>
           <div class="p-6">
-            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark">
+            <div class="flex items-center justify-between bg-bgInput p-4 rounded-lg border border-borderDark mb-6">
               <div>
                 <h3 class="font-bold text-white">Enable Quota Tracker</h3>
                 <p class="text-sm text-textMuted mt-1">Limit spending per key.</p>
@@ -330,6 +357,11 @@
               <div class="w-10 h-6 bg-borderDark rounded-full flex items-center px-1 cursor-pointer toggle-btn" onclick="toggleConfig('quota', this)">
                  <div class="w-4 h-4 bg-white rounded-full transition-transform"></div>
               </div>
+            </div>
+
+            <!-- Visual Quota Grid -->
+            <div id="quota-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+               <!-- Dynamic quota cards injected here -->
             </div>
           </div>
         </div>
@@ -405,6 +437,17 @@
             </form>
           </div>
         </div>
+
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden mt-6">
+          <div class="px-6 py-5 border-b border-borderDark">
+            <h3 class="font-bold text-white">Registered Tools</h3>
+          </div>
+          <div class="p-6">
+             <div id="tools-list" class="space-y-2">
+                <!-- Dynamic tool rows here -->
+             </div>
+          </div>
+        </div>
       </div>
 
       <!-- ================= SECTION: PROXY ================= -->
@@ -440,7 +483,14 @@
             <form id="tool-form" class="space-y-4 max-w-xl" onsubmit="saveTool(event)">
               <div>
                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Tool Name (Function Name)</label>
-                 <input type="text" id="tool-name" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="e.g., get_weather" required>
+                 <input type="text" id="tool-name" list="builtin-tools" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="e.g., get_weather" required>
+                 <datalist id="builtin-tools">
+                    <option value="get_weather">
+                    <option value="search_youtube">
+                    <option value="web_search">
+                    <option value="fetch_url">
+                 </datalist>
+                 <p class="text-xs text-textMuted mt-1">Select a pre-built tool from the dropdown, or type a custom one.</p>
               </div>
               <div>
                 <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">API Endpoint URL</label>
@@ -561,25 +611,54 @@
         const res = await fetch('/api/keys');
         const keys = await res.json();
         const container = document.getElementById('unified-keys-list');
+        container.innerHTML = ''; // clear previous content
 
         if (keys.length === 0) {
-          container.innerHTML = '<div class="text-textMuted italic text-sm py-2">No API keys created yet.</div>';
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-textMuted italic text-sm py-2';
+          emptyDiv.textContent = 'No API keys created yet.';
+          container.appendChild(emptyDiv);
           return;
         }
 
-        container.innerHTML = keys.map(k => `
-          <div class="flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-4 group hover:border-accentOrange/50 transition-colors">
-            <div>
-              <div class="font-bold text-white">${k.name}</div>
-              <div class="text-xs font-mono text-textMuted mt-1">${k.key}</div>
-            </div>
-            <div class="flex items-center gap-2">
-               <button class="bg-bgHover border border-borderDark p-2 rounded-lg text-textMuted hover:text-white transition" title="Copy Key">
-                 <i data-lucide="copy" class="w-4 h-4"></i>
-               </button>
-            </div>
-          </div>
-        `).join('');
+        keys.forEach(k => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-4 group hover:border-accentOrange/50 transition-colors mb-2';
+
+          const infoDiv = document.createElement('div');
+
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'font-bold text-white';
+          nameDiv.textContent = k.name;
+
+          const keyDiv = document.createElement('div');
+          keyDiv.className = 'text-xs font-mono text-textMuted mt-1';
+          keyDiv.textContent = k.key;
+
+          infoDiv.appendChild(nameDiv);
+          infoDiv.appendChild(keyDiv);
+
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'flex items-center gap-2';
+
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-textMuted hover:text-white transition';
+          copyBtn.title = 'Copy Key';
+          copyBtn.onclick = () => navigator.clipboard.writeText(k.key);
+
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'copy');
+          icon.className = 'w-4 h-4';
+
+          copyBtn.appendChild(icon);
+          actionsDiv.appendChild(copyBtn);
+
+          row.appendChild(infoDiv);
+          row.appendChild(actionsDiv);
+
+          container.appendChild(row);
+        });
+
         lucide.createIcons();
       } catch (e) {
         console.error("Failed to load keys", e);
@@ -597,6 +676,56 @@
       loadKeys();
     }
 
+    async function loadProviders() {
+      try {
+        const res = await fetch('/api/providers');
+        const providers = await res.json();
+        const container = document.getElementById('providers-list');
+        container.innerHTML = '';
+
+        if (providers.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-textMuted italic text-sm py-2';
+          emptyDiv.textContent = 'No providers configured yet.';
+          container.appendChild(emptyDiv);
+          return;
+        }
+
+        providers.forEach(p => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-3 group';
+
+          const infoDiv = document.createElement('div');
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'font-bold text-white capitalize';
+          nameDiv.textContent = p.provider_name;
+          infoDiv.appendChild(nameDiv);
+
+          const actionsDiv = document.createElement('div');
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
+          delBtn.onclick = async () => {
+             await fetch('/api/providers/' + p.id, { method: 'DELETE' });
+             loadProviders();
+          };
+
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'trash-2');
+          icon.className = 'w-4 h-4';
+
+          delBtn.appendChild(icon);
+          actionsDiv.appendChild(delBtn);
+
+          row.appendChild(infoDiv);
+          row.appendChild(actionsDiv);
+
+          container.appendChild(row);
+        });
+        lucide.createIcons();
+      } catch (e) { console.error(e); }
+    }
+
     async function saveProvider(e) {
       e.preventDefault();
       await fetch('/api/providers', {
@@ -610,6 +739,57 @@
       });
       alert('Provider saved successfully!');
       e.target.reset();
+      loadProviders();
+    }
+
+    async function loadTools() {
+      try {
+        const res = await fetch('/api/tools');
+        const tools = await res.json();
+        const container = document.getElementById('tools-list');
+        container.innerHTML = '';
+
+        if (tools.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-textMuted italic text-sm py-2';
+          emptyDiv.textContent = 'No tools registered yet.';
+          container.appendChild(emptyDiv);
+          return;
+        }
+
+        tools.forEach(t => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-3 group';
+
+          const infoDiv = document.createElement('div');
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'font-bold text-white';
+          nameDiv.textContent = t.tool_name;
+          infoDiv.appendChild(nameDiv);
+
+          const actionsDiv = document.createElement('div');
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
+          delBtn.onclick = async () => {
+             await fetch('/api/tools/' + t.id, { method: 'DELETE' });
+             loadTools();
+          };
+
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'trash-2');
+          icon.className = 'w-4 h-4';
+
+          delBtn.appendChild(icon);
+          actionsDiv.appendChild(delBtn);
+
+          row.appendChild(infoDiv);
+          row.appendChild(actionsDiv);
+
+          container.appendChild(row);
+        });
+        lucide.createIcons();
+      } catch (e) { console.error(e); }
     }
 
     async function saveTool(e) {
@@ -625,6 +805,57 @@
       });
       alert('Tool registered successfully!');
       e.target.reset();
+      loadTools();
+    }
+
+    async function loadCombos() {
+      try {
+        const res = await fetch('/api/combos');
+        const combos = await res.json();
+        const container = document.getElementById('combos-list');
+        container.innerHTML = '';
+
+        if (combos.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-textMuted italic text-sm py-2';
+          emptyDiv.textContent = 'No combos configured yet.';
+          container.appendChild(emptyDiv);
+          return;
+        }
+
+        combos.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-3 group';
+
+          const infoDiv = document.createElement('div');
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'font-bold text-white';
+          nameDiv.textContent = c.name + ' (' + c.primary_model + ' -> ' + c.fallback_model + ')';
+          infoDiv.appendChild(nameDiv);
+
+          const actionsDiv = document.createElement('div');
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
+          delBtn.onclick = async () => {
+             await fetch('/api/combos/' + c.id, { method: 'DELETE' });
+             loadCombos();
+          };
+
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'trash-2');
+          icon.className = 'w-4 h-4';
+
+          delBtn.appendChild(icon);
+          actionsDiv.appendChild(delBtn);
+
+          row.appendChild(infoDiv);
+          row.appendChild(actionsDiv);
+
+          container.appendChild(row);
+        });
+        lucide.createIcons();
+      } catch (e) { console.error(e); }
     }
 
     async function saveCombo(e) {
@@ -640,6 +871,7 @@
       });
       alert('Combo saved successfully!');
       e.target.reset();
+      loadCombos();
     }
 
     async function saveMedia(e) {
@@ -661,19 +893,51 @@
         const res = await fetch('/api/usage');
         const data = await res.json();
         const tbody = document.getElementById('usage-table-body');
+        tbody.innerHTML = '';
+
         if (data.length === 0) {
-           tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-textMuted">No usage recorded yet.</td></tr>';
+           const tr = document.createElement('tr');
+           const td = document.createElement('td');
+           td.colSpan = 5;
+           td.className = 'py-4 text-center text-textMuted';
+           td.textContent = 'No usage recorded yet.';
+           tr.appendChild(td);
+           tbody.appendChild(tr);
            return;
         }
-        tbody.innerHTML = data.map(r => `
-          <tr class="hover:bg-bgHover transition-colors">
-            <td class="py-3 px-4 font-medium capitalize text-accentOrange">${r.provider}</td>
-            <td class="py-3 px-4 font-mono text-xs">${r.model}</td>
-            <td class="py-3 px-4">${r.prompt_tokens.toLocaleString()}</td>
-            <td class="py-3 px-4">${r.completion_tokens.toLocaleString()}</td>
-            <td class="py-3 px-4 text-right font-medium">$${r.total_cost.toFixed(4)}</td>
-          </tr>
-        `).join('');
+
+        data.forEach(r => {
+           const tr = document.createElement('tr');
+           tr.className = 'hover:bg-bgHover transition-colors';
+
+           const tdProvider = document.createElement('td');
+           tdProvider.className = 'py-3 px-4 font-medium capitalize text-accentOrange';
+           tdProvider.textContent = r.provider;
+
+           const tdModel = document.createElement('td');
+           tdModel.className = 'py-3 px-4 font-mono text-xs';
+           tdModel.textContent = r.model;
+
+           const tdPrompt = document.createElement('td');
+           tdPrompt.className = 'py-3 px-4';
+           tdPrompt.textContent = r.prompt_tokens.toLocaleString();
+
+           const tdCompletion = document.createElement('td');
+           tdCompletion.className = 'py-3 px-4';
+           tdCompletion.textContent = r.completion_tokens.toLocaleString();
+
+           const tdCost = document.createElement('td');
+           tdCost.className = 'py-3 px-4 text-right font-medium';
+           tdCost.textContent = '$' + r.total_cost.toFixed(4);
+
+           tr.appendChild(tdProvider);
+           tr.appendChild(tdModel);
+           tr.appendChild(tdPrompt);
+           tr.appendChild(tdCompletion);
+           tr.appendChild(tdCost);
+
+           tbody.appendChild(tr);
+        });
       } catch (e) { console.error(e); }
     }
 
@@ -843,10 +1107,66 @@
       lucide.createIcons();
     }
 
+    async function loadQuotas() {
+      try {
+        const res = await fetch('/api/quotas');
+        const quotas = await res.json();
+        const container = document.getElementById('quota-grid');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (quotas.length === 0) {
+           container.innerHTML = '<div class="text-textMuted italic text-sm">No API keys to track.</div>';
+           return;
+        }
+
+        quotas.forEach((q) => {
+           const limit = q.limit_usd;
+           const used = q.used_usd || 0;
+           const percent = Math.min(100, Math.round((used / limit) * 100));
+           const isWarning = percent > 80;
+
+           const card = document.createElement('div');
+           card.className = 'bg-bgSidebar border border-borderDark rounded-lg p-4';
+
+           const header = document.createElement('div');
+           header.className = 'flex justify-between items-center mb-3';
+
+           const name = document.createElement('div');
+           name.className = 'font-bold text-white';
+           name.textContent = q.name;
+
+           const amount = document.createElement('div');
+           amount.className = 'text-xs font-mono ' + (isWarning ? 'text-red-500' : 'text-textMuted');
+           amount.textContent = '$' + used.toFixed(2) + ' / $' + limit.toFixed(2);
+
+           header.appendChild(name);
+           header.appendChild(amount);
+
+           const barBg = document.createElement('div');
+           barBg.className = 'w-full bg-bgInput rounded-full h-2 overflow-hidden';
+
+           const barFill = document.createElement('div');
+           barFill.className = 'h-full rounded-full transition-all duration-500 ' + (isWarning ? 'bg-red-500' : 'bg-accentOrange');
+           barFill.style.width = percent + '%';
+
+           barBg.appendChild(barFill);
+
+           card.appendChild(header);
+           card.appendChild(barBg);
+           container.appendChild(card);
+        });
+      } catch (e) { console.error(e); }
+    }
+
     // === Initialization ===
     loadKeys();
     loadUsage();
+    loadQuotas();
     loadConfigs();
+    loadProviders();
+    loadTools();
+    loadCombos();
 
     // Load saved language
     const savedLang = localStorage.getItem('everyRouteLang') || 'en';
@@ -857,3 +1177,5 @@
   </script>
 </body>
 </html>
+<script>
+// Will replace with properly injected script tags

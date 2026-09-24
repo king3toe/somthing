@@ -64,7 +64,32 @@ export const initDb = () => {
       provider_name TEXT UNIQUE NOT NULL,
       api_key TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS ProviderKeys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_name TEXT NOT NULL,
+      api_key TEXT NOT NULL,
+      base_url TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      last_used DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS RequestCache (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_hash TEXT UNIQUE NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+
+  // Migrate existing ProviderConfigs to ProviderKeys if they exist and ProviderKeys is empty
+  const keyCount = db.prepare('SELECT count(*) as c FROM ProviderKeys').get() as {c: number};
+  if (keyCount.c === 0) {
+    db.exec(`
+      INSERT INTO ProviderKeys (provider_name, api_key, base_url)
+      SELECT provider_name, api_key, base_url FROM ProviderConfigs;
+    `);
+  }
 
   // Seed some dummy usage data for the dashboard if empty
   const count = db.prepare('SELECT count(*) as c FROM CostTracking').get() as {c: number};
