@@ -440,11 +440,11 @@
 
         <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden mt-6">
           <div class="px-6 py-5 border-b border-borderDark">
-            <h3 class="font-bold text-white">Registered Tools</h3>
+            <h3 class="font-bold text-white">Configured Media Providers</h3>
           </div>
           <div class="p-6">
-             <div id="tools-list" class="space-y-2">
-                <!-- Dynamic tool rows here -->
+             <div id="media-list" class="space-y-2">
+                <!-- Dynamic media rows here -->
              </div>
           </div>
         </div>
@@ -504,6 +504,17 @@
                 Register Tool
               </button>
             </form>
+          </div>
+        </div>
+
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden mt-6">
+          <div class="px-6 py-5 border-b border-borderDark">
+            <h3 class="font-bold text-white">Registered Tools</h3>
+          </div>
+          <div class="p-6">
+             <div id="tools-list" class="space-y-2">
+                <!-- Dynamic tool rows here -->
+             </div>
           </div>
         </div>
       </div>
@@ -874,6 +885,52 @@
       loadCombos();
     }
 
+    async function loadMedia() {
+      try {
+        const res = await fetch('/api/media');
+        const media = await res.json();
+        const container = document.getElementById('media-list');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (media.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-textMuted italic text-sm py-2';
+          emptyDiv.textContent = 'No media providers configured yet.';
+          container.appendChild(emptyDiv);
+          return;
+        }
+
+        media.forEach(m => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between bg-bgInput border border-borderDark rounded-lg p-3 group';
+
+          const infoDiv = document.createElement('div');
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'font-bold text-white text-sm';
+          nameDiv.textContent = m.provider_name;
+          infoDiv.appendChild(nameDiv);
+
+          const actionsDiv = document.createElement('div');
+          const delBtn = document.createElement('button');
+          delBtn.className = 'text-red-500/50 hover:text-red-500 transition-colors p-1';
+          delBtn.innerHTML = '<i data-lucide="trash" class="w-4 h-4"></i>';
+          delBtn.onclick = async () => {
+             if(confirm('Delete media provider?')) {
+                await fetch(`/api/media/${m.id}`, { method: 'DELETE' });
+                loadMedia();
+             }
+          };
+          actionsDiv.appendChild(delBtn);
+
+          row.appendChild(infoDiv);
+          row.appendChild(actionsDiv);
+          container.appendChild(row);
+        });
+        lucide.createIcons();
+      } catch (e) { console.error(e); }
+    }
+
     async function saveMedia(e) {
       e.preventDefault();
       await fetch('/api/media', {
@@ -886,6 +943,7 @@
       });
       alert('Media Provider saved successfully!');
       e.target.reset();
+      loadMedia();
     }
 
     async function loadUsage() {
@@ -1167,6 +1225,7 @@
     loadProviders();
     loadTools();
     loadCombos();
+    loadMedia();
 
     // Load saved language
     const savedLang = localStorage.getItem('everyRouteLang') || 'en';

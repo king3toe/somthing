@@ -39,6 +39,10 @@ export default async function routerRoutes(fastify: FastifyInstance) {
 
     const isChatEndpoint = request.url.includes('/chat/completions');
 
+    // Explicitly disable upstream streaming so we can intercept, run tools, buffer, and re-emit chunks properly
+    const requestedStream = body.stream;
+    body.stream = false;
+
     // Memory only applies to chat endpoints
     const sessionId = request.headers['x-session-id'] as string | undefined;
     if (isChatEndpoint && body.messages) {
@@ -258,12 +262,12 @@ export default async function routerRoutes(fastify: FastifyInstance) {
         trackCost(targetProvider, actualModel, finalResult.usage, keyRecord.id);
       }
 
-      if (useCache && isChatEndpoint && finalResult && !body.stream) {
+      if (useCache && isChatEndpoint && finalResult && !requestedStream) {
         setCachedResponse(requestHash, finalResult);
       }
 
       // Handle Streaming vs Non-Streaming response formats
-      if (body.stream && finalResult.choices?.[0]?.message) {
+      if (requestedStream && finalResult.choices?.[0]?.message) {
          reply.raw.setHeader('Content-Type', 'text/event-stream');
          reply.raw.setHeader('Cache-Control', 'no-cache');
          reply.raw.setHeader('Connection', 'keep-alive');
