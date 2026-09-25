@@ -34,8 +34,20 @@ export default async function routerRoutes(fastify: FastifyInstance) {
     const isParallelCombo = combo && combo.fallback_model === 'PARALLEL'; // We use the fallback_model field string 'PARALLEL' to denote parallel MoA combos for now
     const actualModel = combo ? combo.primary_model : requestedModel;
 
-    // Update the body model to the actual underlying model
-    body.model = actualModel;
+    // --- Complexity-Based Auto Routing ---
+    // If the user requests the abstract "auto" model, we dynamically assess the prompt to select the best model.
+    if (actualModel === 'auto') {
+      const messagesStr = JSON.stringify(body.messages || []);
+      const isComplex = messagesStr.length > 2000 ||
+                        /code|analyze|math|calculate|logic|reason/i.test(messagesStr);
+
+      // Route complex tasks to a heavy reasoning model, simple tasks to a fast/cheap model
+      body.model = isComplex ? 'gpt-4o' : 'llama-3-8b-instruct';
+      fastify.log.info(`[Auto Routing] Evaluated prompt complexity. Routed to: ${body.model}`);
+    } else {
+      // Update the body model to the actual underlying model
+      body.model = actualModel;
+    }
 
     const isChatEndpoint = request.url.includes('/chat/completions');
 
@@ -64,27 +76,27 @@ export default async function routerRoutes(fastify: FastifyInstance) {
     let targetProvider = 'openai'; // acts as a catch-all for OpenAI-compatible APIs too (Groq, Perplexity, Together, Local)
 
     // Auto-detect provider based on model naming conventions
-    if (actualModel.includes('claude') || actualModel.startsWith('anthropic:')) {
+    if (body.model.includes('claude') || body.model.startsWith('anthropic:')) {
       targetProvider = 'anthropic';
-    } else if (actualModel.startsWith('gemini') || actualModel.includes('google')) {
+    } else if (body.model.startsWith('gemini') || body.model.includes('google')) {
       targetProvider = 'google';
-    } else if (actualModel.startsWith('sonar') || actualModel.includes('pplx')) {
+    } else if (body.model.startsWith('sonar') || body.model.includes('pplx')) {
       targetProvider = 'perplexity';
-    } else if (actualModel.includes('mixtral') || actualModel.includes('gemma') || actualModel.includes('llama')) {
+    } else if (body.model.includes('mixtral') || body.model.includes('gemma') || body.model.includes('llama')) {
       // Common open source models often hosted on Groq or Together. Defaulting to groq for speed
       targetProvider = 'groq';
-    } else if (actualModel.startsWith('grok') || actualModel.includes('xai')) {
+    } else if (body.model.startsWith('grok') || body.model.includes('xai')) {
       targetProvider = 'xai';
     }
 
-    // Load Balancing & Resilient Proxy Pool: Get active, non-rate-limited keys
+    // Advanced Routing: Load Balancing, Weighted Priority, & Lowest Latency proxy pool selection
     const getActiveKeys = (provider: string) => {
       let keys = db.prepare(`
         SELECT * FROM ProviderKeys
         WHERE provider_name = ?
         AND is_active = 1
         AND (rate_limit_until IS NULL OR rate_limit_until < CURRENT_TIMESTAMP)
-        ORDER BY last_used ASC
+        ORDER BY weight DESC, avg_latency_ms ASC, last_used ASC
       `).all(provider) as any[];
 
       if (!keys || keys.length === 0) {
@@ -99,7 +111,7 @@ export default async function routerRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ error: `No configuration or active keys found (or all rate-limited) for provider: ${targetProvider}` });
     }
 
-    // Select key (simple round-robin based on oldest last_used)
+    // Select optimal key based on SQL sort (highest weight, then lowest latency, then oldest last_used)
     let selectedKeyConfig = activeKeys[0];
     if (selectedKeyConfig.id && selectedKeyConfig.is_active !== undefined) {
       db.prepare('UPDATE ProviderKeys SET last_used = CURRENT_TIMESTAMP WHERE id = ?').run(selectedKeyConfig.id);
@@ -210,6 +222,7 @@ export default async function routerRoutes(fastify: FastifyInstance) {
 
     try {
       let finalResult;
+      const startTime = Date.now();
 
       if (isParallelCombo) {
          // Parallel Combo (Mixture of Agents) Logic
@@ -253,9 +266,19 @@ export default async function routerRoutes(fastify: FastifyInstance) {
         saveMemory(sessionId, (request.body as any).messages || [], finalResult.choices[0].message);
       }
 
-      // Reset error count on success
+      const latencyMs = Date.now() - startTime;
+
+      // Update metrics on success
       if (selectedKeyConfig.id) {
-         db.prepare('UPDATE ProviderKeys SET error_count = 0 WHERE id = ?').run(selectedKeyConfig.id);
+         db.prepare(`
+            UPDATE ProviderKeys
+            SET error_count = 0,
+                avg_latency_ms = CASE
+                   WHEN avg_latency_ms = 0 THEN ?
+                   ELSE (avg_latency_ms + ?) / 2
+                END
+            WHERE id = ?
+         `).run(latencyMs, latencyMs, selectedKeyConfig.id);
       }
 
       if (finalResult && finalResult.usage) {

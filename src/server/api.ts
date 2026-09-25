@@ -17,7 +17,7 @@ export default async function apiRoutes(fastify: FastifyInstance) {
 
   // === PROVIDERS ===
   fastify.get('/api/providers', async () => {
-    return db.prepare('SELECT id, provider_name, api_key, base_url, is_active FROM ProviderKeys').all();
+    return db.prepare('SELECT id, provider_name, api_key, base_url, is_active, weight, avg_latency_ms FROM ProviderKeys').all();
   });
 
   fastify.delete('/api/providers/:id', async (request, reply) => {
@@ -27,7 +27,8 @@ export default async function apiRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post('/api/providers', async (request, reply) => {
-    const { provider_name, api_key, base_url } = request.body as any;
+    const { provider_name, api_key, base_url, weight } = request.body as any;
+    const w = parseInt(weight) || 1;
     // Keep legacy ProviderConfigs updated for base_url
     db.prepare(`
       INSERT INTO ProviderConfigs (provider_name, api_key, base_url)
@@ -39,9 +40,9 @@ export default async function apiRoutes(fastify: FastifyInstance) {
 
     // Insert into ProviderKeys to support multiple keys (Load Balancing)
     db.prepare(`
-      INSERT INTO ProviderKeys (provider_name, api_key, base_url)
-      VALUES (?, ?, ?)
-    `).run(provider_name, api_key, base_url);
+      INSERT INTO ProviderKeys (provider_name, api_key, base_url, weight)
+      VALUES (?, ?, ?, ?)
+    `).run(provider_name, api_key, base_url, w);
 
     return { success: true };
   });

@@ -247,12 +247,18 @@
                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">API Key</label>
                  <input type="password" id="provider-key" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="sk-..." required>
               </div>
-              <div>
-                <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Base URL (Optional)</label>
-                <input type="text" id="provider-url" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="https://api.openai.com/v1">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Base URL (Optional)</label>
+                  <input type="text" id="provider-url" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="https://api.openai.com/v1">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Weight Priority (1-100)</label>
+                  <input type="number" id="provider-weight" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="1" min="1" max="100" value="1">
+                </div>
               </div>
               <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
-                Save Configuration
+                Add Key to Pool
               </button>
             </form>
           </div>
@@ -708,9 +714,14 @@
 
           const infoDiv = document.createElement('div');
           const nameDiv = document.createElement('div');
-          nameDiv.className = 'font-bold text-white capitalize';
-          nameDiv.textContent = p.provider_name;
+          nameDiv.className = 'font-bold text-white capitalize flex items-center gap-2';
+          nameDiv.innerHTML = `${p.provider_name} <span class="bg-borderDark text-textMuted px-2 py-0.5 rounded text-[10px]">Weight: ${p.weight || 1}</span><span class="bg-borderDark text-textMuted px-2 py-0.5 rounded text-[10px]">Ping: ${p.avg_latency_ms || 0}ms</span>`;
           infoDiv.appendChild(nameDiv);
+
+          const subDiv = document.createElement('div');
+          subDiv.className = 'text-xs text-textMuted mt-1';
+          subDiv.textContent = p.base_url || 'Default Endpoint';
+          infoDiv.appendChild(subDiv);
 
           const actionsDiv = document.createElement('div');
 
@@ -746,6 +757,7 @@
           provider_name: document.getElementById('provider-name').value,
           api_key: document.getElementById('provider-key').value,
           base_url: document.getElementById('provider-url').value,
+          weight: document.getElementById('provider-weight').value || 1
         })
       });
       alert('Provider saved successfully!');

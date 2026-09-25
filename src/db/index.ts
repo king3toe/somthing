@@ -73,7 +73,9 @@ export const initDb = () => {
       is_active BOOLEAN DEFAULT 1,
       last_used DATETIME,
       error_count INTEGER DEFAULT 0,
-      rate_limit_until DATETIME
+      rate_limit_until DATETIME,
+      avg_latency_ms INTEGER DEFAULT 0,
+      weight INTEGER DEFAULT 1
     );
 
     -- Add columns to existing ProviderKeys if they don't exist
