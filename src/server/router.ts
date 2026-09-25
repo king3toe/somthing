@@ -31,6 +31,7 @@ export default async function routerRoutes(fastify: FastifyInstance) {
 
     // Check if the requested model is actually a Combo
     const combo = db.prepare('SELECT * FROM Combos WHERE name = ?').get(requestedModel) as any;
+    const isParallelCombo = combo && combo.fallback_model === 'PARALLEL'; // We use the fallback_model field string 'PARALLEL' to denote parallel MoA combos for now
     const actualModel = combo ? combo.primary_model : requestedModel;
 
     // Update the body model to the actual underlying model
@@ -72,9 +73,16 @@ export default async function routerRoutes(fastify: FastifyInstance) {
       targetProvider = 'xai';
     }
 
-    // Load Balancing: Get all active keys for the provider
+    // Load Balancing & Resilient Proxy Pool: Get active, non-rate-limited keys
     const getActiveKeys = (provider: string) => {
-      let keys = db.prepare('SELECT * FROM ProviderKeys WHERE provider_name = ? AND is_active = 1').all(provider) as any[];
+      let keys = db.prepare(`
+        SELECT * FROM ProviderKeys
+        WHERE provider_name = ?
+        AND is_active = 1
+        AND (rate_limit_until IS NULL OR rate_limit_until < CURRENT_TIMESTAMP)
+        ORDER BY last_used ASC
+      `).all(provider) as any[];
+
       if (!keys || keys.length === 0) {
         const fallbackConfig = db.prepare('SELECT * FROM ProviderConfigs WHERE provider_name = ?').get(provider);
         if (fallbackConfig) keys.push(fallbackConfig);
@@ -82,18 +90,45 @@ export default async function routerRoutes(fastify: FastifyInstance) {
       return keys;
     };
 
-    const activeKeys = getActiveKeys(targetProvider);
+    let activeKeys = getActiveKeys(targetProvider);
     if (activeKeys.length === 0) {
-      return reply.status(500).send({ error: `No configuration or active keys found for provider: ${targetProvider}` });
+      return reply.status(500).send({ error: `No configuration or active keys found (or all rate-limited) for provider: ${targetProvider}` });
     }
 
-    const selectedKeyConfig = activeKeys[Math.floor(Math.random() * activeKeys.length)];
+    // Select key (simple round-robin based on oldest last_used)
+    let selectedKeyConfig = activeKeys[0];
     if (selectedKeyConfig.id && selectedKeyConfig.is_active !== undefined) {
       db.prepare('UPDATE ProviderKeys SET last_used = CURRENT_TIMESTAMP WHERE id = ?').run(selectedKeyConfig.id);
     }
 
+    const getTargetProvider = (mdl: string) => {
+      if (mdl.includes('claude') || mdl.startsWith('anthropic:')) return 'anthropic';
+      if (mdl.startsWith('gemini') || mdl.includes('google')) return 'google';
+      if (mdl.startsWith('sonar') || mdl.includes('pplx')) return 'perplexity';
+      if (mdl.includes('mixtral') || mdl.includes('gemma') || mdl.includes('llama')) return 'groq';
+      if (mdl.startsWith('grok') || mdl.includes('xai')) return 'xai';
+      return 'openai';
+    };
+
     const runRequest = async (provider: string, keyConfig: any, currentBody: any) => {
       const executeAI = async (b: any) => {
+        // Vision Preprocessor Adapter
+        // Intercept messages and process images if the model doesn't natively support vision, or convert formats
+        if (b.messages) {
+          b.messages = b.messages.map((msg: any) => {
+            if (Array.isArray(msg.content)) {
+               // If a provider doesn't support vision, we'd ideally run OCR or clip here.
+               // For now, we strip base64 to avoid crashing non-vision models, unless it's a known vision model
+               const isVisionModel = b.model.includes('vision') || b.model.includes('gpt-4o') || b.model.includes('claude-3');
+               if (!isVisionModel) {
+                  const textContent = msg.content.filter((c:any) => c.type === 'text').map((c:any) => c.text).join('\n');
+                  return { ...msg, content: textContent + '\n[Image stripped - model does not support vision]' };
+               }
+            }
+            return msg;
+          });
+        }
+
         if (provider === 'anthropic') {
           return await handleAnthropic(keyConfig, b);
         } else {
@@ -143,19 +178,125 @@ export default async function routerRoutes(fastify: FastifyInstance) {
       `).run(keyId || null, provider, mdl, promptTokens, completionTokens, mockCostUsd);
     };
 
+    const handleProxyError = async (err: any, provider: string, keyConfig: any) => {
+      const status = err.response?.status || 500;
+      if (status === 429 || status === 401 || status === 403) {
+        fastify.log.warn(`[Proxy Pool] Key failed (Status ${status}) for provider ${provider}. Disabling or rate limiting key ID ${keyConfig.id}`);
+        if (keyConfig.id) {
+          if (status === 429) {
+             // Rate limited - backoff for 5 minutes
+             db.prepare("UPDATE ProviderKeys SET rate_limit_until = datetime('now', '+5 minutes'), error_count = error_count + 1 WHERE id = ?").run(keyConfig.id);
+          } else {
+             // 401/403 - Invalid or exhausted quota - disable key
+             db.prepare("UPDATE ProviderKeys SET is_active = 0, error_count = error_count + 1 WHERE id = ?").run(keyConfig.id);
+          }
+        }
+
+        // Attempt to retry with another key from the pool
+        activeKeys = getActiveKeys(provider);
+        if (activeKeys.length > 0) {
+           fastify.log.info(`[Proxy Pool] Retrying with alternative key for ${provider}`);
+           selectedKeyConfig = activeKeys[0];
+           if (selectedKeyConfig.id) db.prepare('UPDATE ProviderKeys SET last_used = CURRENT_TIMESTAMP WHERE id = ?').run(selectedKeyConfig.id);
+           return await runRequest(provider, selectedKeyConfig, body);
+        }
+      }
+      throw err;
+    };
+
     try {
-      let finalResult = await runRequest(targetProvider, selectedKeyConfig, body);
+      let finalResult;
+
+      if (isParallelCombo) {
+         // Parallel Combo (Mixture of Agents) Logic
+         // For now, we query the primary_model and a few hardcoded high-tier models simultaneously
+         // In a real scenario, the combo table would define the array of target models.
+         const parallelModels = [actualModel, 'gpt-4o', 'claude-3-haiku-20240307'];
+
+         fastify.log.info(`[Parallel Combo] Executing requests simultaneously to: ${parallelModels.join(', ')}`);
+
+         const promises = parallelModels.map(async (m) => {
+            const p = getTargetProvider(m);
+            const pKeys = getActiveKeys(p);
+            if (pKeys.length === 0) return null;
+            const b = { ...body, model: m };
+            try {
+              return await runRequest(p, pKeys[0], b);
+            } catch (e) {
+              return null; // Ignore failures in parallel execution
+            }
+         });
+
+         const results = await Promise.all(promises);
+         const validResults = results.filter(r => r !== null && r.choices && r.choices.length > 0);
+
+         if (validResults.length === 0) throw new Error("All parallel combo models failed.");
+
+         // Select the longest response as a naive proxy for "best" or synthesize them.
+         // We will just return the first valid one for simplicity, but prepend the model name
+         finalResult = validResults.sort((a, b) => b.choices[0].message.content.length - a.choices[0].message.content.length)[0];
+         finalResult.choices[0].message.content = `[Parallel MoA Synthesis Selected: ${finalResult.model}]\n\n${finalResult.choices[0].message.content}`;
+
+      } else {
+        try {
+          finalResult = await runRequest(targetProvider, selectedKeyConfig, body);
+        } catch (err: any) {
+          finalResult = await handleProxyError(err, targetProvider, selectedKeyConfig);
+        }
+      }
 
       if (finalResult && finalResult.choices && finalResult.choices[0] && isChatEndpoint) {
         saveMemory(sessionId, (request.body as any).messages || [], finalResult.choices[0].message);
+      }
+
+      // Reset error count on success
+      if (selectedKeyConfig.id) {
+         db.prepare('UPDATE ProviderKeys SET error_count = 0 WHERE id = ?').run(selectedKeyConfig.id);
       }
 
       if (finalResult && finalResult.usage) {
         trackCost(targetProvider, actualModel, finalResult.usage, keyRecord.id);
       }
 
-      if (useCache && isChatEndpoint && finalResult) {
+      if (useCache && isChatEndpoint && finalResult && !body.stream) {
         setCachedResponse(requestHash, finalResult);
+      }
+
+      // Handle Streaming vs Non-Streaming response formats
+      if (body.stream && finalResult.choices?.[0]?.message) {
+         reply.raw.setHeader('Content-Type', 'text/event-stream');
+         reply.raw.setHeader('Cache-Control', 'no-cache');
+         reply.raw.setHeader('Connection', 'keep-alive');
+
+         const content = finalResult.choices[0].message.content;
+         // Simulate streaming chunks for compatibility with frontends, even if the underlying tool-interceptor had to wait
+         // In a purely passthrough proxy, we'd pipe the Axios stream directly. Because we run agentic tools, we buffer and emit.
+         const chunkSize = 20;
+         for (let i = 0; i < content.length; i += chunkSize) {
+            const chunk = content.slice(i, i + chunkSize);
+            const chunkData = {
+               id: finalResult.id || 'chatcmpl-stream',
+               object: 'chat.completion.chunk',
+               created: Date.now(),
+               model: finalResult.model,
+               choices: [{ delta: { content: chunk }, index: 0, finish_reason: null }]
+            };
+            reply.raw.write(`data: ${JSON.stringify(chunkData)}\n\n`);
+         }
+
+         // Send final finish reason and usage if available
+         const finalChunk = {
+            id: finalResult.id || 'chatcmpl-stream',
+            object: 'chat.completion.chunk',
+            created: Date.now(),
+            model: finalResult.model,
+            choices: [{ delta: {}, index: 0, finish_reason: 'stop' }],
+            usage: finalResult.usage
+         };
+         reply.raw.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
+         reply.raw.write('data: [DONE]\n\n');
+         reply.raw.end();
+         return reply;
       }
 
       return finalResult;

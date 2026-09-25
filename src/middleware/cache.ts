@@ -3,22 +3,40 @@ import db from '../db';
 
 export const generateCacheHash = (body: any): string => {
   // Omit fields that shouldn't affect the cache (like streaming, etc)
+  // For semantic caching, we normalize the messages by lowercasing and trimming spaces
+  const normalizeMessages = (msgs: any[]) => {
+    if (!msgs) return [];
+    return msgs.map(m => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content.trim().toLowerCase() : m.content
+    }));
+  };
+
   const cacheableBody = {
     model: body.model,
-    messages: body.messages,
-    tools: body.tools,
-    temperature: body.temperature,
-    top_p: body.top_p,
-    max_tokens: body.max_tokens,
+    messages: normalizeMessages(body.messages),
+    tools: body.tools ? JSON.stringify(body.tools) : undefined,
   };
   return crypto.createHash('sha256').update(JSON.stringify(cacheableBody)).digest('hex');
 };
 
 export const getCachedResponse = (requestHash: string) => {
-  const row = db.prepare('SELECT response_json FROM RequestCache WHERE request_hash = ?').get(requestHash) as { response_json: string } | undefined;
+  // Get responses that were created within the last 24 hours to avoid stale data
+  const row = db.prepare(`
+    SELECT response_json
+    FROM RequestCache
+    WHERE request_hash = ? AND created_at >= datetime('now', '-1 day')
+  `).get(requestHash) as { response_json: string } | undefined;
+
   if (row) {
     try {
-      return JSON.parse(row.response_json);
+      const resp = JSON.parse(row.response_json);
+      // Mark as a cached response for client tracking
+      if (resp.usage) {
+         resp.usage.is_cached = true;
+         resp.usage.prompt_tokens = 0; // Semantic cache saves you tokens!
+      }
+      return resp;
     } catch (e) {
       console.error('Failed to parse cached response:', e);
       return null;

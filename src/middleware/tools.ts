@@ -119,7 +119,13 @@ export const resolveToolCall = async (toolCall: any) => {
 };
 
 export const withToolInterceptor = async (executeAI: (body: any) => Promise<any>, body: any, depth = 0): Promise<any> => {
-  if (depth > 5) throw new Error("Max tool execution depth reached");
+  const MAX_DEPTH = 10; // Allow deeper agentic reasoning chains
+  if (depth > MAX_DEPTH) {
+    console.warn("Max tool execution depth reached. Forcing response.");
+    return {
+      choices: [{ message: { role: 'assistant', content: 'I have reached my maximum thinking steps and must stop. Here is what I know so far based on my tool usage.' } }]
+    };
+  }
 
   const response = await executeAI(body);
   const choice = response.choices?.[0];
@@ -129,18 +135,26 @@ export const withToolInterceptor = async (executeAI: (body: any) => Promise<any>
 
     body.messages.push(choice.message);
 
-    for (const toolCall of toolCalls) {
-      console.log(`Executing tool: ${toolCall.function.name}`);
+    // Advanced Agentic Skills: Execute all tools in parallel if requested by the LLM
+    const toolPromises = toolCalls.map(async (toolCall: any) => {
+      console.log(`[Agentic Skill] Executing step ${depth}, Tool: ${toolCall.function.name}`);
       const toolResultStr = await resolveToolCall(toolCall);
-
-      body.messages.push({
+      return {
         role: 'tool',
         tool_call_id: toolCall.id,
         name: toolCall.function.name,
         content: toolResultStr
-      });
+      };
+    });
+
+    const toolResults = await Promise.all(toolPromises);
+
+    // Append all results to context
+    for (const res of toolResults) {
+      body.messages.push(res);
     }
 
+    // Agent autonomously evaluates and chains next steps
     return withToolInterceptor(executeAI, body, depth + 1);
   }
 

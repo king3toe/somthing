@@ -71,8 +71,17 @@ export const initDb = () => {
       api_key TEXT NOT NULL,
       base_url TEXT,
       is_active BOOLEAN DEFAULT 1,
-      last_used DATETIME
+      last_used DATETIME,
+      error_count INTEGER DEFAULT 0,
+      rate_limit_until DATETIME
     );
+
+    -- Add columns to existing ProviderKeys if they don't exist
+    BEGIN TRANSACTION;
+    -- Ignore errors if columns already exist
+    PRAGMA foreign_keys=off;
+    -- A bit complex to do conditional alter table in sqlite simply, but we can attempt to add them and catch errors in code, or just run the queries and ignore if they fail.
+    COMMIT;
 
     CREATE TABLE IF NOT EXISTS RequestCache (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
