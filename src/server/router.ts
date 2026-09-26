@@ -9,59 +9,18 @@ import { Readable } from 'stream';
 import crypto from 'crypto';
 import db from '../db';
 import { estimateTokens } from '../registry/counter';
-
-export const breakerState = new Map<number, { state: 'CLOSED' | 'OPEN' | 'HALF_OPEN', retryAfter: number, currentBackoff: number }>();
-
-function getBreaker(id: number) {
-   if (!breakerState.has(id)) breakerState.set(id, { state: 'CLOSED', retryAfter: 0, currentBackoff: 0 });
-   return breakerState.get(id)!;
-}
-
-function handleBreakerSuccess(id: number) {
-   const b = getBreaker(id);
-   b.state = 'CLOSED';
-   b.retryAfter = 0;
-   b.currentBackoff = 0;
-   db.prepare('UPDATE ProviderKeys SET rate_limit_until = NULL WHERE id = ?').run(id);
-}
-
-function handleBreakerFailure(id: number, errMessage: string) {
-   const b = getBreaker(id);
-   let cooldownMs = 0;
-
-   if (errMessage.includes('429')) cooldownMs = b.currentBackoff === 0 ? 20000 : Math.min(b.currentBackoff * 2, 300000);
-   else if (errMessage.includes('401') || errMessage.includes('403')) {
-      b.state = 'OPEN';
-      b.retryAfter = Date.now() + 1000 * 60 * 60 * 24 * 365;
-      db.prepare('UPDATE ProviderKeys SET is_active = 0 WHERE id = ?').run(id);
-      return;
-   }
-   else if (errMessage.includes('500') || errMessage.includes('502') || errMessage.includes('503')) cooldownMs = b.currentBackoff === 0 ? 5000 : Math.min(b.currentBackoff * 3, 120000);
-   else cooldownMs = b.currentBackoff === 0 ? 10000 : Math.min(b.currentBackoff * 2, 120000);
-
-   b.state = 'OPEN';
-   b.currentBackoff = cooldownMs;
-   b.retryAfter = Date.now() + cooldownMs;
-   db.prepare('UPDATE ProviderKeys SET rate_limit_until = ? WHERE id = ?').run(new Date(b.retryAfter).toISOString(), id);
-}
+import { canUseKey, recordSuccess, recordFailure } from '../core/circuit-breaker';
 
 function getBestProviderKey(modelId: string, estimatedTokens: number) {
    const keys = getProviderKeys();
    let availableKeys = [];
-   const now = Date.now();
 
    const registry = db.prepare('SELECT provider FROM ModelRegistry WHERE model_id = ?').get(modelId) as any;
    const providerStr = registry?.provider || 'openai';
 
    for (const k of keys) {
       if (k.provider_name.toLowerCase() !== providerStr.toLowerCase() && k.provider_name.toLowerCase() !== 'mock_openai') continue;
-      const b = getBreaker(k.id);
-      if (b.state === 'OPEN') {
-         if (now > b.retryAfter) {
-            b.state = 'HALF_OPEN';
-            availableKeys.push(k);
-         }
-      } else if (b.state === 'CLOSED') {
+      if (canUseKey(k.id)) {
          availableKeys.push(k);
       }
    }
@@ -102,13 +61,15 @@ export default async function router(fastify: FastifyInstance) {
     const body: any = request.body;
     const requestedStream = body.stream === true;
 
-
     let targetModel = body.model || 'gpt-4o';
     const estimatedInputTokens = estimateTokens(body.messages || [], targetModel);
 
     if (targetModel === 'auto') {
         const resolved = resolveAutoModel(body.messages || [], estimatedInputTokens);
-        if (!resolved) return reply.status(503).send({ error: 'No capable or healthy models available for auto-routing' });
+        if (!resolved) {
+           reply.header('x-everyroute-reason', 'no_healthy_capable_model');
+           return reply.status(503).send({ error: 'No capable or healthy models available for auto-routing' });
+        }
         targetModel = resolved;
         body.model = targetModel;
     }
@@ -151,6 +112,9 @@ export default async function router(fastify: FastifyInstance) {
       const comboName = body.model.replace('combo:', '');
       const comboConfig = db.prepare('SELECT * FROM Combos WHERE name = ?').get(comboName);
       if (comboConfig) {
+         if ((comboConfig as any).models_json.includes('combo:')) {
+            return reply.status(400).send({ error: 'Nested combo cycles are not permitted.' });
+         }
          body.is_combo = true;
          body.combo_config = comboConfig;
       }
@@ -162,44 +126,50 @@ export default async function router(fastify: FastifyInstance) {
        return reply.status(503).send({ error: 'All configured providers for this model are rate-limited or exhausted.' });
     }
 
-
     const abortController = new AbortController();
     request.raw.on('close', () => {
-      if (!reply.raw.writableEnded && !request.raw.complete) {
-         abortController.abort(new Error("client_disconnected"));
-      }
+      if (!reply.raw.writableEnded && !request.raw.complete) abortController.abort(new Error("client_disconnected"));
     });
     request.raw.on('aborted', () => {
       abortController.abort(new Error("client_disconnected"));
     });
 
     const metricsCallback = (metrics: any) => {
-        setTimeout(() => {
-           try {
-               const p = metrics.is_subcall ? metrics.provider : selectedProvider;
-               if (!p) return;
+        // Run synchronously to ensure CircuitBreaker remains atomic on failures/successes
+        const p = metrics.is_subcall ? metrics.provider : selectedProvider;
+        if (p) {
+            if (metrics.errorCount > 0 && metrics.errorObj) {
+                recordFailure(p.id, metrics.errorObj.message);
+                // Async persist error counter
+                setTimeout(() => {
+                    try { db.prepare('UPDATE ProviderKeys SET error_count = error_count + 1 WHERE id = ?').run(p.id); } catch(e){}
+                }, 0);
+            } else if (metrics.errorCount === 0) {
+                recordSuccess(p.id);
+                // Async persist averages
+                setTimeout(() => {
+                    try {
+                        db.prepare(`
+                          UPDATE ProviderKeys
+                          SET last_used = CURRENT_TIMESTAMP,
+                              avg_latency_ms = CASE WHEN avg_latency_ms = 0 THEN ? ELSE (avg_latency_ms + ?) / 2 END,
+                              ttft_ms = CASE WHEN ttft_ms = 0 THEN ? ELSE (ttft_ms + ?) / 2 END
+                          WHERE id = ?
+                        `).run(metrics.latency_ms, metrics.latency_ms, metrics.ttft_ms || 0, metrics.ttft_ms || 0, p.id);
+                    } catch(e) {}
+                }, 0);
+            }
 
-               if (metrics.errorCount > 0 && metrics.errorObj && metrics.errorObj.message !== 'client_disconnected' && metrics.errorObj.name !== 'AbortError') {
-                   handleBreakerFailure(p.id, metrics.errorObj.message);
-                   db.prepare('UPDATE ProviderKeys SET error_count = error_count + 1 WHERE id = ?').run(p.id);
-               } else if (metrics.errorCount === 0) {
-                   handleBreakerSuccess(p.id);
-                   db.prepare(`
-                      UPDATE ProviderKeys
-                      SET last_used = CURRENT_TIMESTAMP,
-                          avg_latency_ms = CASE WHEN avg_latency_ms = 0 THEN ? ELSE (avg_latency_ms + ?) / 2 END,
-                          ttft_ms = CASE WHEN ttft_ms = 0 THEN ? ELSE (ttft_ms + ?) / 2 END
-                      WHERE id = ?
-                   `).run(metrics.latency_ms, metrics.latency_ms, metrics.ttft_ms || 0, metrics.ttft_ms || 0, p.id);
-               }
-
-               if (metrics.usage) {
-                   db.prepare('INSERT INTO CostTracking (provider, model, prompt_tokens, completion_tokens) VALUES (?, ?, ?, ?)').run(
-                      p.provider_name, targetModel, metrics.usage.prompt_tokens || 0, metrics.usage.completion_tokens || 0
-                   );
-               }
-           } catch(e) {}
-        }, 0);
+            if (metrics.usage) {
+               setTimeout(() => {
+                   try {
+                       db.prepare('INSERT INTO CostTracking (provider, model, prompt_tokens, completion_tokens) VALUES (?, ?, ?, ?)').run(
+                          p.provider_name, targetModel, metrics.usage.prompt_tokens || 0, metrics.usage.completion_tokens || 0
+                       );
+                   } catch(e) {}
+               }, 0);
+            }
+        }
     };
 
     const ctx = { ...body, signal: abortController.signal };
@@ -231,7 +201,6 @@ export default async function router(fastify: FastifyInstance) {
        streamEvents.on('error', () => {});
        return reply.send(streamEvents);
     } else {
-       // Mock complete flow for non-streaming
        return reply.status(400).send({ error: "Non-streaming is not fully implemented in this phase mock." });
     }
   });

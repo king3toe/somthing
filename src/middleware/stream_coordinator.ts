@@ -130,7 +130,13 @@ export async function* runAgentStream(
       for (const t of internalToolsToRun) {
           try {
              let args = {};
-             try { args = JSON.parse(t.args); } catch(e) {}
+             try {
+                 args = JSON.parse(t.args);
+             } catch(e) {
+                 // Execution gate: if args don't parse, skip execution
+                 results.push({ id: t.id, name: t.name, result: "Error: Arguments must be valid JSON." });
+                 continue;
+             }
 
              const out = await resolveToolCall({ function: { name: t.name, arguments: t.args } });
              results.push({ id: t.id, name: t.name, result: out });

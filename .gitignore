@@ -6,3 +6,7 @@ data/
 *.db-shm
 *.db-wal
 server.log
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/.master.key

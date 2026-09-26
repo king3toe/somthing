@@ -6,7 +6,7 @@
   "scripts": {
     "start": "tsc && node dist/server/index.js",
     "dev": "ts-node src/server/index.js",
-    "test": "tsc && NODE_ENV=test node run_tests.js"
+    "test": "tsc && NODE_ENV=test node tests/streaming/streaming.test.ts"
   },
   "repository": {
     "type": "git",

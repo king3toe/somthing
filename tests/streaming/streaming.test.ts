@@ -2,10 +2,10 @@ const assert = require('assert');
 const http = require('http');
 
 // Setup DB and Env
-const { initDb, default: db } = require('./dist/db');
+const { initDb, default: db } = require('../../dist/db');
 initDb();
-const { encryptKey } = require('./dist/server/auth/encryption');
-require('./dist/server/auth/encryption').initEncryptionKey();
+const { encryptKey } = require('../../dist/server/auth/encryption');
+require('../../dist/server/auth/encryption').initEncryptionKey();
 
 // Clean DB for tests
 db.prepare('DELETE FROM ProviderKeys').run();
@@ -23,7 +23,7 @@ let realServer;
 
 async function startServers() {
     return new Promise((resolve) => {
-        mockServer = spawn('node', ['mock_upstream.js']);
+        mockServer = spawn('node', ['tests/mocks/sse-upstream.ts']);
         realServer = spawn('node', ['dist/server/index.js']);
 
         mockServer.stdout.on('data', (d) => console.log('Mock: ' + d));
@@ -126,7 +126,7 @@ async function runTests() {
 
   console.log("\n=== PHASE 2 BRAINS TESTS ===");
 
-  const { estimateTokens } = require('./dist/registry/counter');
+  const { estimateTokens } = require('../../dist/registry/counter');
   console.log("Testing Pre-flight Tiktoken Counting...");
   const count = estimateTokens([{role: 'user', content: 'testing'}]);
   assert(count > 0, "Counter should estimate > 0");

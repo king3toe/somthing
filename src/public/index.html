@@ -694,7 +694,15 @@
     }
 
 
-    async function loadModels() {
+
+   async function updateModel(id, field, value) {
+      // Stub for full CRUD
+   }
+
+   async function deleteModel(id) {
+      // Stub for full CRUD
+   }
+   async function loadModels() {
        const res = await fetch('/api/registry');
        if (!res.ok) return;
        const models = await res.json();
