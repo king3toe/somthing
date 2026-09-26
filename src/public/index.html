@@ -693,7 +693,73 @@
       loadKeys();
     }
 
-    async function loadProviders() {
+
+    async function loadModels() {
+       const res = await fetch('/api/registry');
+       if (!res.ok) return;
+       const models = await res.json();
+       const list = document.getElementById('models-list');
+       list.innerHTML = '';
+       models.forEach(m => {
+          list.innerHTML += `
+            <div class="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">${m.model_id}</h3>
+                        <p class="text-sm text-gray-400">${m.provider}</p>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-400 mb-2">Ctx: ${m.ctx_window} | Out: ${m.max_output}</div>
+                <div class="text-sm text-gray-400 mb-4">In: ${m.cost_input_1m}/M | Out: ${m.cost_output_1m}/M</div>
+                <div class="flex space-x-2">
+                    ${m.vision ? '<span class="bg-blue-900 text-blue-200 text-xs px-2 py-1 rounded">Vision</span>' : ''}
+                    ${m.tools ? '<span class="bg-green-900 text-green-200 text-xs px-2 py-1 rounded">Tools</span>' : ''}
+                </div>
+            </div>
+          `;
+       });
+    }
+
+    async function loadCombos() {
+       const res = await fetch('/api/combos');
+       if (!res.ok) return;
+       const combos = await res.json();
+       const list = document.getElementById('combos-list');
+       list.innerHTML = '';
+       combos.forEach(c => {
+          list.innerHTML += `
+            <div class="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">${c.name}</h3>
+                        <p class="text-sm text-gray-400">Mode: ${c.mode}</p>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-400 mb-2">Models: ${JSON.parse(c.models_json).join(', ')}</div>
+                <button onclick="deleteCombo('${c.id}')" class="text-red-400 hover:text-red-300 text-sm mt-4">Delete</button>
+            </div>
+          `;
+       });
+    }
+
+    async function createCombo() {
+       const name = document.getElementById('combo-name').value;
+       const mode = document.getElementById('combo-mode').value;
+       const models = document.getElementById('combo-models').value.split(',').map(s => s.trim());
+       await fetch('/api/combos', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, mode, models_json: JSON.stringify(models) })
+       });
+       loadCombos();
+    }
+
+    async function resetBreaker(id) {
+       await fetch('/api/providers/reset/' + id, { method: 'POST' });
+       loadProviders(); loadModels(); loadCombos();
+    }
+
+async function loadProviders() {
       try {
         const res = await fetch('/api/providers');
         const providers = await res.json();
@@ -729,7 +795,7 @@
           delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
           delBtn.onclick = async () => {
              await fetch('/api/providers/' + p.id, { method: 'DELETE' });
-             loadProviders();
+             loadProviders(); loadModels(); loadCombos();
           };
 
           const icon = document.createElement('i');
@@ -762,7 +828,7 @@
       });
       alert('Provider saved successfully!');
       e.target.reset();
-      loadProviders();
+      loadProviders(); loadModels(); loadCombos();
     }
 
     async function loadTools() {
@@ -1234,7 +1300,7 @@
     loadUsage();
     loadQuotas();
     loadConfigs();
-    loadProviders();
+    loadProviders(); loadModels(); loadCombos();
     loadTools();
     loadCombos();
     loadMedia();

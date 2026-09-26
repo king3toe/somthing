@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 
-const dbPath = path.resolve(__dirname, '../../router.db');
+const dbPath = path.resolve(__dirname, '../../data/router.db');
 const db = new Database(dbPath, { verbose: console.log });
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');

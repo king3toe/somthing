@@ -90,6 +90,12 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     return { success: true };
   });
 
+  fastify.post('/api/providers/reset/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    db.prepare('UPDATE ProviderKeys SET is_active = 1, rate_limit_until = NULL, error_count = 0 WHERE id = ?').run(id);
+    return { success: true };
+  });
+
   // === TOOLS ===
   fastify.get('/api/tools', async () => {
     const rows = db.prepare('SELECT * FROM ToolConfigs').all() as any[];
@@ -123,13 +129,19 @@ export default async function apiRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post('/api/combos', async (request, reply) => {
-    const { name, primary_model, fallback_model } = request.body as any;
-    db.prepare('INSERT INTO Combos (name, primary_model, fallback_model) VALUES (?, ?, ?)').run(name, primary_model, fallback_model);
+    const { name, mode, models_json } = request.body as any;
+    db.prepare('INSERT INTO Combos (name, mode, models_json) VALUES (?, ?, ?)')
+      .run(name, mode || 'sequential', models_json || '[]');
     return { success: true };
   });
 
   fastify.get('/api/combos', async () => {
     return db.prepare('SELECT * FROM Combos').all();
+  });
+
+  // === REGISTRY ===
+  fastify.get('/api/registry', async () => {
+    return db.prepare('SELECT * FROM ModelRegistry').all();
   });
 
   // === USAGE ===

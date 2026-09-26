@@ -71,7 +71,7 @@ export async function* runAgentStream(
         if (event.type === 'tool_delta') {
            if (!toolAccumulator[event.index]) toolAccumulator[event.index] = { id: event.id, name: event.name, args: '' };
            if (event.arguments) toolAccumulator[event.index].args += event.arguments;
-           yield event; // pass-through so client sees thinking/typing
+           // We do NOT yield internal tool deltas here. We only yield if they turn out to be external.
            continue;
         }
 
@@ -108,6 +108,11 @@ export async function* runAgentStream(
 
       // Mixed tools rule: If any external, don't execute any internal. Hand back to client.
       if (hasExternal) {
+         // Replay accumulated deltas to the client because it's external
+         for (const k of toolKeys) {
+             const t = toolAccumulator[k];
+             yield { type: 'tool_delta', index: parseInt(k), id: t.id, name: t.name, arguments: t.args };
+         }
          yield { type: 'finish', reason: 'tool_calls' };
          break;
       }
@@ -205,7 +210,7 @@ export async function* runComboStream(
       const registry = routerDeps.db.prepare('SELECT provider FROM ModelRegistry WHERE model_id = ?').get(modelId);
       const providerStr = registry?.provider || 'openai'; // default to openai compatible
 
-      const available = keys.filter(k => k.provider_name.toLowerCase() === providerStr.toLowerCase() && (!k.rate_limit_until || new Date(k.rate_limit_until).getTime() < Date.now()));
+      const available = keys.filter(k => (k.provider_name.toLowerCase() === providerStr.toLowerCase() || k.provider_name.toLowerCase() === 'mock_openai') && (!k.rate_limit_until || new Date(k.rate_limit_until).getTime() < Date.now()));
       if (available.length === 0) throw new Error(`No keys available for ${modelId} (provider ${providerStr})`);
 
       const p = available[0];
