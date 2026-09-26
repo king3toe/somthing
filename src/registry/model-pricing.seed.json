@@ -1,0 +1,38 @@
+[
+  {
+    "model_id": "gpt-4o",
+    "provider": "openai",
+    "vision": true,
+    "tools": true,
+    "json_mode": true,
+    "ctx_window": 128000,
+    "max_output": 4096,
+    "cost_input_1m": 5,
+    "cost_output_1m": 15,
+    "cost_cache_read_1m": 2.5
+  },
+  {
+    "model_id": "gpt-4o-mini",
+    "provider": "openai",
+    "vision": true,
+    "tools": true,
+    "json_mode": true,
+    "ctx_window": 128000,
+    "max_output": 16384,
+    "cost_input_1m": 0.15,
+    "cost_output_1m": 0.6,
+    "cost_cache_read_1m": 0.075
+  },
+  {
+    "model_id": "claude-3-5-sonnet-20240620",
+    "provider": "anthropic",
+    "vision": true,
+    "tools": true,
+    "json_mode": true,
+    "ctx_window": 200000,
+    "max_output": 8192,
+    "cost_input_1m": 3,
+    "cost_output_1m": 15,
+    "cost_cache_read_1m": 0.3
+  }
+]

@@ -30,7 +30,8 @@
     "fastify": "^4.28.1",
     "ipaddr.js": "^2.5.0",
     "jsonwebtoken": "^9.0.3",
-    "open": "^10.1.0"
+    "open": "^10.1.0",
+    "tiktoken": "^1.0.22"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

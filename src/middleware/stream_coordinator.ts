@@ -28,6 +28,7 @@ export async function* runAgentStream(
   const startTime = Date.now();
   let firstTokenTime: number | null = null;
   let errorCount = 0;
+  let lastErrorObj: any = null;
 
   let aggregatedUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
   let currentReq = { ...baseReq };
@@ -153,7 +154,8 @@ export async function* runAgentStream(
          ttft_ms: firstTokenTime ? (firstTokenTime - startTime) : null,
          latency_ms: Date.now() - startTime,
          errorCount,
-         usage: aggregatedUsage
+         usage: aggregatedUsage,
+         errorObj: lastErrorObj
       });
     }
   }
@@ -176,4 +178,130 @@ export async function* toSSE(stream: AsyncGenerator<StreamEvent, void, unknown>,
     }
   }
   yield 'data: [DONE]\n\n';
+}
+
+
+import { getProviderKeys } from '../db';
+import { decryptKey } from '../server/auth/encryption';
+
+export async function* runComboStream(
+  comboConfig: any,
+  baseReq: AdapterRequest,
+  routerDeps: {
+     db: any,
+     abortController: AbortController,
+     streamAnthropic: any,
+     streamOpenAI: any,
+     metricsCallback: any
+  }
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const models = JSON.parse(comboConfig.models_json);
+  let globalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  let currentReq = { ...baseReq };
+  let responses: string[] = [];
+
+  const getAdapterForModel = (modelId: string) => {
+      const keys = getProviderKeys();
+      const registry = routerDeps.db.prepare('SELECT provider FROM ModelRegistry WHERE model_id = ?').get(modelId);
+      const providerStr = registry?.provider || 'openai'; // default to openai compatible
+
+      const available = keys.filter(k => k.provider_name.toLowerCase() === providerStr.toLowerCase() && (!k.rate_limit_until || new Date(k.rate_limit_until).getTime() < Date.now()));
+      if (available.length === 0) throw new Error(`No keys available for ${modelId} (provider ${providerStr})`);
+
+      const p = available[0];
+      const runtimeProvider = { ...p, api_key: decryptKey(p.api_key) };
+
+      return {
+         p: runtimeProvider,
+         fn: (req: AdapterRequest) => providerStr === 'anthropic' ? routerDeps.streamAnthropic(runtimeProvider, req) : routerDeps.streamOpenAI(runtimeProvider, req)
+      };
+  };
+
+  if (comboConfig.mode === 'sequential') {
+      for (let i = 0; i < models.length; i++) {
+         const model = models[i];
+         const isFinal = (i === models.length - 1);
+         currentReq.model = model;
+
+         const { p, fn } = getAdapterForModel(model);
+         const stream = runAgentStream(fn, currentReq, (metrics) => {
+             if (metrics.usage) {
+                 globalUsage.prompt_tokens += metrics.usage.prompt_tokens;
+                 globalUsage.completion_tokens += metrics.usage.completion_tokens;
+                 globalUsage.total_tokens += metrics.usage.total_tokens;
+             }
+             routerDeps.metricsCallback({ ...metrics, is_subcall: true, provider: p });
+         });
+
+         let synthesized = '';
+         for await (const event of stream) {
+             if (event.type === 'usage') continue;
+
+             if (event.type === 'content') {
+                 synthesized += event.text;
+             }
+
+             if (isFinal || comboConfig.stream_intermediates) {
+                 yield event;
+             }
+         }
+
+         responses.push(synthesized);
+         if (!isFinal) {
+             currentReq.messages = [
+                 ...currentReq.messages,
+                 { role: 'assistant', content: synthesized },
+                 { role: 'user', content: "Please review, refine, or synthesize the previous draft." }
+             ];
+         }
+      }
+  } else if (comboConfig.mode === 'parallel') {
+      yield { type: 'ping' };
+
+      const promises = models.map(async (model: string) => {
+          const { p, fn } = getAdapterForModel(model);
+          const localReq = { ...currentReq, model };
+          const stream = runAgentStream(fn, localReq, (metrics) => {
+              if (metrics.usage) {
+                 globalUsage.prompt_tokens += metrics.usage.prompt_tokens;
+                 globalUsage.completion_tokens += metrics.usage.completion_tokens;
+                 globalUsage.total_tokens += metrics.usage.total_tokens;
+              }
+              routerDeps.metricsCallback({ ...metrics, is_subcall: true, provider: p });
+          });
+
+          let content = '';
+          for await (const event of stream) {
+              if (event.type === 'content') content += event.text;
+          }
+          return { model, content };
+      });
+
+      const pingInterval = setInterval(() => { }, 15000);
+      const results = await Promise.all(promises);
+      clearInterval(pingInterval);
+
+      const synthModel = models[0];
+      currentReq.model = synthModel;
+      currentReq.messages = [
+          ...currentReq.messages,
+          { role: 'user', content: `Here are multiple perspectives:\n\n${results.map(r => `[${r.model}]: ${r.content}`).join('\n\n')}\n\nSynthesize the best answer.` }
+      ];
+
+      const { p, fn } = getAdapterForModel(synthModel);
+      const synthStream = runAgentStream(fn, currentReq, (metrics) => {
+             if (metrics.usage) {
+                 globalUsage.prompt_tokens += metrics.usage.prompt_tokens;
+                 globalUsage.completion_tokens += metrics.usage.completion_tokens;
+                 globalUsage.total_tokens += metrics.usage.total_tokens;
+             }
+             routerDeps.metricsCallback({ ...metrics, is_subcall: true, provider: p });
+      });
+
+      for await (const event of synthStream) {
+          if (event.type !== 'usage') yield event;
+      }
+  }
+
+  yield { type: 'usage', usage: globalUsage };
 }
