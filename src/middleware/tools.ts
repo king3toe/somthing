@@ -1,3 +1,4 @@
+import { safeFetch } from './ssrf';
 import axios from 'axios';
 import db from '../db';
 
@@ -92,7 +93,8 @@ export const resolveToolCall = async (toolCall: any) => {
       return JSON.stringify(result.data.organic?.map((o: any) => ({ title: o.title, link: o.link, snippet: o.snippet })) || result.data);
     }
     else if (toolName === 'fetch_url') {
-      result = await axios.get((args as any).url);
+      const r = await safeFetch((args as any).url);
+      result = { data: await r.text() };
       // extremely basic text extraction for demo purposes
       const html = result.data;
       const text = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '')

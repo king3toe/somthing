@@ -50,6 +50,7 @@ export async function safeFetch(url: string, options?: RequestInit): Promise<Res
   safeUrl.hostname = safeIp;
 
   return fetch(safeUrl.toString(), {
+    redirect: 'manual',
     ...options,
     headers
   });

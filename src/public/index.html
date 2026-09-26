@@ -1246,6 +1246,43 @@
     setLanguage(savedLang);
 
   </script>
+
+  <script>
+    async function checkAuth(res) {
+        if (res.status === 401) {
+            document.getElementById('login-overlay').style.display = 'flex';
+            return false;
+        }
+        return true;
+    }
+
+    async function attemptLogin() {
+        const pass = document.getElementById('admin-pass').value;
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: pass })
+        });
+        if (res.ok) {
+            document.getElementById('login-overlay').style.display = 'none';
+            // Reload dashboard data
+            loadDashboard();
+        } else {
+            document.getElementById('login-error').style.display = 'block';
+        }
+    }
+
+    // Patch all existing fetch calls in the UI to check 401
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+        const res = await originalFetch(...args);
+        if (args[0] && typeof args[0] === 'string' && args[0].startsWith('/api/') && args[0] !== '/api/login') {
+             checkAuth(res.clone());
+        }
+        return res;
+    };
+  </script>
+
 </body>
 </html>
 <script>

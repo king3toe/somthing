@@ -1,11 +1,9 @@
-import { StreamEvent } from '../middleware/stream_types';
+import { StreamEvent, AdapterRequest } from '../middleware/stream_types';
 import { createParser, EventSourceMessage } from 'eventsource-parser';
 
-export async function* handleOpenAI(
+export async function* streamOpenAI(
   providerConfig: any,
-  body: any,
-  isStream: boolean = false,
-  signal?: AbortSignal
+  req: AdapterRequest
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const url = providerConfig.base_url || 'https://api.openai.com/v1/chat/completions';
   const headers = {
@@ -13,40 +11,34 @@ export async function* handleOpenAI(
     'Authorization': `Bearer ${providerConfig.api_key}`
   };
 
+  const payload = { ...req };
+  delete payload.signal;
+  payload.stream = true;
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ ...body, stream: isStream }),
-    signal
+    body: JSON.stringify(payload),
+    signal: req.signal
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-  }
-
-  if (!isStream) {
-    const data = await response.json();
-    if (data.choices?.[0]?.message?.content) {
-      yield { type: 'content', text: data.choices[0].message.content };
-    }
-    if (data.usage) {
-      yield { type: 'usage', usage: data.usage };
-    }
-    yield { type: 'finish', reason: data.choices?.[0]?.finish_reason || 'stop' };
-    return;
+    let errBody = '';
+    try { errBody = await response.text(); } catch(e) {}
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText} ${errBody}`);
   }
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('Response body is null');
 
   const decoder = new TextDecoder('utf-8');
+  let queue: string[] = [];
+
   const parser = createParser({
-    onEvent: (event) => {
+    onEvent: (event: EventSourceMessage) => {
       queue.push(event.data);
     }
   });
-
-  let queue: string[] = [];
 
   try {
     while (true) {
@@ -57,8 +49,8 @@ export async function* handleOpenAI(
         while (queue.length > 0) {
           const data = queue.shift();
           if (data === '[DONE]') {
-            yield { type: 'finish', reason: 'stop' };
-            return;
+            // we do NOT yield [DONE]. toSSE handles that.
+            continue;
           }
           if (data) {
             try {
@@ -70,6 +62,9 @@ export async function* handleOpenAI(
               if (delta?.tool_calls?.length > 0) {
                  const tc = delta.tool_calls[0];
                  yield { type: 'tool_delta', index: tc.index, id: tc.id, name: tc.function?.name, arguments: tc.function?.arguments };
+              }
+              if (parsed.choices?.[0]?.finish_reason) {
+                 yield { type: 'finish', reason: parsed.choices[0].finish_reason };
               }
               if (parsed.usage) {
                  yield { type: 'usage', usage: parsed.usage };
@@ -84,4 +79,39 @@ export async function* handleOpenAI(
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function completeOpenAI(
+  providerConfig: any,
+  req: AdapterRequest
+): Promise<any> {
+  const url = providerConfig.base_url || 'https://api.openai.com/v1/chat/completions';
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${providerConfig.api_key}`
+  };
+
+  const payload = { ...req };
+  delete payload.signal;
+  payload.stream = false;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    signal: req.signal
+  });
+
+  if (!response.ok) {
+    let errBody = '';
+    try { errBody = await response.text(); } catch(e) {}
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText} ${errBody}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data.choices?.[0]?.message?.content || '',
+    usage: data.usage,
+    finishReason: data.choices?.[0]?.finish_reason || 'stop'
+  };
 }
