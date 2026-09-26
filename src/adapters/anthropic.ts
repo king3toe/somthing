@@ -1,134 +1,91 @@
-import axios from 'axios';
+import { StreamEvent } from '../middleware/stream_types';
+import { createParser, EventSourceMessage } from 'eventsource-parser';
 
-export const handleAnthropic = async (providerConfig: any, body: any) => {
-  const apiKey = providerConfig.api_key;
-  const baseUrl = providerConfig.base_url || 'https://api.anthropic.com/v1';
-
-  let anthropicMessages: any[] = [];
-  let systemPrompt = "";
-
-  for (const msg of body.messages) {
-    if (msg.role === 'system') {
-      systemPrompt = msg.content;
-    } else if (msg.role === 'tool') {
-      // Check if the previous message was also a tool result (or is already a bundled user tool result)
-      const lastMsg = anthropicMessages[anthropicMessages.length - 1];
-      const toolBlock = {
-        type: 'tool_result',
-        tool_use_id: msg.tool_call_id,
-        content: msg.content
-      };
-
-      if (lastMsg && lastMsg.role === 'user' && Array.isArray(lastMsg.content) && lastMsg.content.some((c: any) => c.type === 'tool_result')) {
-        // Bundle with existing parallel tool calls
-        lastMsg.content.push(toolBlock);
-      } else {
-        // Create new user block for tool results
-        anthropicMessages.push({
-          role: 'user',
-          content: [toolBlock]
-        });
-      }
-    } else if (msg.role === 'assistant' && msg.tool_calls) {
-       let content: any[] = msg.content ? [{ type: 'text', text: msg.content }] : [];
-       for (const tool of msg.tool_calls) {
-         content.push({
-           type: 'tool_use',
-           id: tool.id,
-           name: tool.function.name,
-           input: JSON.parse(tool.function.arguments || '{}')
-         });
-       }
-       anthropicMessages.push({ role: 'assistant', content });
-    } else {
-      anthropicMessages.push({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      });
-    }
-  }
-
-  const anthropicBody: any = {
-    model: body.model.replace('anthropic:', '') || 'claude-3-opus-20240229',
-    messages: anthropicMessages,
-    max_tokens: body.max_tokens || 1024,
+export async function* handleAnthropic(
+  providerConfig: any,
+  body: any,
+  isStream: boolean = false,
+  signal?: AbortSignal
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const url = providerConfig.base_url || 'https://api.anthropic.com/v1/messages';
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': providerConfig.api_key,
+    'anthropic-version': '2023-06-01'
   };
 
-  if (systemPrompt) {
-    anthropicBody.system = systemPrompt;
+  const anthropicBody = {
+    model: body.model || 'claude-3-haiku-20240307',
+    max_tokens: body.max_tokens || 1024,
+    messages: body.messages,
+    stream: isStream
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(anthropicBody),
+    signal
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
   }
 
-  // Translate OpenAI tools to Anthropic format
-  if (body.tools && body.tools.length > 0) {
-    anthropicBody.tools = body.tools.map((t: any) => ({
-      name: t.function.name,
-      description: t.function.description || '',
-      input_schema: t.function.parameters || { type: 'object', properties: {} }
-    }));
+  if (!isStream) {
+    const data = await response.json();
+    if (data.content?.[0]?.text) {
+      yield { type: 'content', text: data.content[0].text };
+    }
+    if (data.usage) {
+      yield { type: 'usage', usage: { prompt_tokens: data.usage.input_tokens, completion_tokens: data.usage.output_tokens, total_tokens: data.usage.input_tokens + data.usage.output_tokens } };
+    }
+    yield { type: 'finish', reason: data.stop_reason || 'stop' };
+    return;
   }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Response body is null');
+
+  const decoder = new TextDecoder('utf-8');
+  let eventType = '';
+  const parser = createParser({
+    onEvent: (event) => {
+       if (event.event) eventType = event.event;
+       queue.push({ event: eventType, data: event.data });
+    }
+  });
+
+  let queue: { event: string, data: string }[] = [];
 
   try {
-    const response = await axios.post(`${baseUrl}/messages`, anthropicBody, {
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const anthropicResponse = response.data;
-
-    // Translate response back to OpenAI format
-    let finalContent = null;
-    let toolCalls = [];
-
-    for (const block of anthropicResponse.content) {
-      if (block.type === 'text') {
-        finalContent = block.text;
-      } else if (block.type === 'tool_use') {
-        toolCalls.push({
-          id: block.id,
-          type: 'function',
-          function: {
-            name: block.name,
-            arguments: JSON.stringify(block.input)
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        parser.feed(decoder.decode(value, { stream: true }));
+        while (queue.length > 0) {
+          const item = queue.shift();
+          if (item) {
+             const data = JSON.parse(item.data);
+             if (item.event === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                yield { type: 'content', text: data.delta.text };
+             } else if (item.event === 'content_block_delta' && data.delta?.type === 'input_json_delta') {
+                yield { type: 'tool_delta', index: data.index, arguments: data.delta.partial_json };
+             } else if (item.event === 'content_block_start' && data.content_block?.type === 'tool_use') {
+                yield { type: 'tool_delta', index: data.index, id: data.content_block.id, name: data.content_block.name };
+             } else if (item.event === 'message_delta' && data.usage) {
+                yield { type: 'usage', usage: { prompt_tokens: 0, completion_tokens: data.usage.output_tokens, total_tokens: data.usage.output_tokens } };
+             } else if (item.event === 'message_stop') {
+                yield { type: 'finish', reason: 'stop' };
+             } else if (item.event === 'error') {
+                yield { type: 'error', error: new Error(data.error?.message || 'Anthropic error') };
+             }
           }
-        });
-      }
-    }
-
-    const openaiResponse: any = {
-      id: anthropicResponse.id,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: anthropicResponse.model,
-      choices: [
-        {
-          index: 0,
-          message: {
-             role: 'assistant',
-             content: finalContent
-          },
-          finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop'
         }
-      ],
-      usage: {
-        prompt_tokens: anthropicResponse.usage?.input_tokens || 0,
-        completion_tokens: anthropicResponse.usage?.output_tokens || 0,
-        total_tokens: (anthropicResponse.usage?.input_tokens || 0) + (anthropicResponse.usage?.output_tokens || 0)
       }
-    };
-
-    if (toolCalls.length > 0) {
-      openaiResponse.choices[0].message.tool_calls = toolCalls;
     }
-
-    return openaiResponse;
-
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(`Anthropic API error: ${JSON.stringify(error.response.data)}`);
-    }
-    throw error;
+  } finally {
+    reader.releaseLock();
   }
-};
+}

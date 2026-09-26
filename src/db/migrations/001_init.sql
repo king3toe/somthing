@@ -1,0 +1,57 @@
+
+CREATE TABLE IF NOT EXISTS UnifiedKeys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ProviderKeys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_name TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  base_url TEXT,
+  is_active BOOLEAN DEFAULT 1,
+  last_used DATETIME,
+  error_count INTEGER DEFAULT 0,
+  rate_limit_until DATETIME,
+  avg_latency_ms INTEGER DEFAULT 0,
+  weight INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS ToolConfigs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tool_name TEXT UNIQUE NOT NULL,
+  api_key TEXT,
+  base_url TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Combos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  primary_model TEXT NOT NULL,
+  fallback_model TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS CostTracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  unified_key_id INTEGER,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  cost_usd REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS SystemConfigs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  config_key TEXT UNIQUE NOT NULL,
+  config_value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS MediaProviders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_name TEXT UNIQUE NOT NULL,
+  api_key TEXT NOT NULL
+);
