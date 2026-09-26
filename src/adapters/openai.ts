@@ -14,6 +14,7 @@ export async function* streamOpenAI(
   const payload = { ...req };
   delete payload.signal;
   payload.stream = true;
+  payload.stream_options = { include_usage: true };
 
   const response = await fetch(url, {
     method: 'POST',
