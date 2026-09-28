@@ -65,7 +65,14 @@
       <button onclick="switchTab('endpoint')" id="nav-endpoint" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_endpoint">
         <i data-lucide="gem" class="w-4 h-4"></i> Endpoint & Key
       </button>
-      <button onclick="switchTab('providers')" id="nav-providers" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_providers">
+
+        <button onclick="switchTab('models')" id="tab-models" class="nav-item w-full flex items-center gap-3 px-4 py-3 mb-2 font-medium">
+          <i data-lucide="brain" class="w-5 h-5"></i> <span data-i18n="nav.models">Model Registry</span>
+        </button>
+        <button onclick="switchTab('combos')" id="tab-combos" class="nav-item w-full flex items-center gap-3 px-4 py-3 mb-2 font-medium">
+          <i data-lucide="git-merge" class="w-5 h-5"></i> <span data-i18n="nav.combos">Combos (MoA)</span>
+        </button>
+        <button onclick="switchTab('providers')" id="nav-providers" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_providers">
         <i data-lucide="server" class="w-4 h-4"></i> Providers
       </button>
       <button onclick="switchTab('combo')" id="nav-combo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_combo">
