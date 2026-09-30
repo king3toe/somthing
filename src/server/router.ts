@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import db from '../db';
 import { recordSuccess, recordFailure } from '../core/circuit-breaker';
 import { getCachedResponse, setCachedResponse, generateCacheHash as generateRequestHash } from '../middleware/cache';
+import { PredefinedToolSchemas } from '../middleware/tools';
 import { estimateTokens } from '../registry/counter';
 import { canUseKey } from '../core/circuit-breaker';
 
@@ -190,6 +191,15 @@ export default async function router(fastify: FastifyInstance) {
     const requestedStream = body.stream === true;
 
     let targetModel = body.model || 'gpt-4o';
+
+    // Auto-inject all PredefinedTools to enhance AI advantages, unless disabled
+    if (request.headers['x-everyroute-auto-tools'] !== 'false') {
+        const injectedTools = Object.values(PredefinedToolSchemas).map(schema => ({
+            type: "function",
+            function: schema
+        }));
+        body.tools = body.tools ? [...body.tools, ...injectedTools] : injectedTools;
+    }
     const estimatedInputTokens = estimateTokens(body.messages || [], targetModel);
 
     if (targetModel === 'auto') {

@@ -128,6 +128,9 @@
       <button onclick="switchTab('combo')" id="nav-combo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_combo">
         <i data-lucide="layers" class="w-4 h-4"></i> Combo & Vision Adapter
       </button>
+      <button onclick="switchTab('tools')" id="nav-tools" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_tools">
+        <i data-lucide="wrench" class="w-4 h-4"></i> Tools & Plugins
+      </button>
       <button onclick="switchTab('usage')" id="nav-usage" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_usage">
         <i data-lucide="bar-chart-2" class="w-4 h-4"></i> Usage
       </button>
@@ -377,6 +380,24 @@
           <div class="p-6">
              <div id="combos-list" class="space-y-2">
                 <!-- Dynamic combo rows here -->
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SECTION: TOOLS ================= -->
+      <div id="section-tools" class="section-content space-y-6 hidden">
+        <div class="bg-bgCard rounded-xl border border-borderDark overflow-hidden">
+          <div class="px-6 py-5 border-b border-borderDark flex justify-between items-center">
+            <div class="flex items-center gap-3">
+               <i data-lucide="wrench" class="w-5 h-5 text-accentOrange"></i>
+               <h2 class="font-bold text-lg text-white">Predefined Tools & Plugins</h2>
+            </div>
+          </div>
+          <div class="p-6">
+             <p class="text-sm text-textMuted mb-6 max-w-2xl">EveryRoute comes with built-in advanced tools that you can expose to LLMs. Configure API keys for tools below to enable them during auto-routing.</p>
+             <div id="tools-list" class="space-y-4">
+                <!-- Dynamically loaded tools -->
              </div>
           </div>
         </div>
@@ -1060,6 +1081,39 @@ async function loadProviders() {
       loadCombos(); loadTraces();
     }
 
+    async function loadTools() {
+      try {
+        const res = await fetch('/api/tools');
+        const tools = await res.json();
+        const container = document.getElementById('tools-list');
+        container.innerHTML = '';
+
+        tools.forEach(t => {
+          const div = document.createElement('div');
+          div.className = 'bg-bgInput border border-borderDark rounded-lg p-4';
+          div.innerHTML = `
+             <div class="flex justify-between items-center mb-3">
+                <span class="font-bold text-white">${t.tool_name}</span>
+                <span class="text-xs bg-bgHover px-2 py-1 rounded text-textMuted">Base URL: ${t.base_url || 'Default'}</span>
+             </div>
+             <div class="flex gap-4">
+                <input type="password" id="tool-key-${t.id}" class="flex-1 bg-bgHover border border-borderDark text-textMain rounded px-3 py-1.5 text-sm" placeholder="Enter API Key to enable..." value="${t.api_key ? '********' : ''}">
+                <button onclick="saveToolKey(${t.id})" class="bg-accentOrange text-bgCard px-4 py-1.5 rounded font-bold text-sm hover:brightness-110">Save</button>
+             </div>
+          `;
+          container.appendChild(div);
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    async function saveToolKey(id) {
+       const key = document.getElementById(`tool-key-${id}`).value;
+       if (key === '********') return;
+       await fetch('/api/tools/' + id, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ api_key: key }) });
+       alert('Tool updated successfully');
+       loadTools();
+    }
+
     async function loadMedia() {
       try {
         const res = await fetch('/api/media');
@@ -1094,6 +1148,7 @@ async function loadProviders() {
              if(confirm('Delete media provider?')) {
                 await fetch(`/api/media/${m.id}`, { method: 'DELETE' });
                 loadMedia();
+      loadTools();
              }
           };
           actionsDiv.appendChild(delBtn);

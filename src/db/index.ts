@@ -40,7 +40,10 @@ export const initDb = () => {
   if (count.c > 0) {
       const toolCount = db.prepare('SELECT count(*) as c FROM ToolConfigs').get() as {c: number};
       if (toolCount.c === 0) {
-         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('fetch_url', '', 'local');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('fetch_url', '', '');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('get_weather', '', 'https://api.openweathermap.org/data/2.5/weather');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('search_youtube', '', 'https://www.googleapis.com/youtube/v3');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('web_search', '', 'https://google.serper.dev/search');
       }
   }
 

@@ -23,6 +23,19 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       const parsed = JSON.parse(body);
       const isToolCall = parsed.messages && parsed.messages[0]?.content?.includes('trigger_tool');
+      const hasAutoTools = parsed.tools && parsed.tools.some(t => t.function.name === 'get_weather');
+      if (parsed.messages && parsed.messages[0]?.content?.includes('trigger_auto_tools') && !hasAutoTools) {
+          res.writeHead(400);
+          return res.end(JSON.stringify({ error: "Missing auto-injected tools!" }));
+      }
+      if (parsed.messages && parsed.messages[0]?.content?.includes('trigger_auto_tools')) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          res.write('data: {"choices": [{"delta": {"content": "I have tools!"}}]}\n\n');
+          res.write('data: {"choices": [{"finish_reason": "stop"}]}\n\n');
+          res.write('data: {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}\n\n');
+          res.write("data: [DONE]\n\n");
+          return res.end();
+      }
       const isExternalToolCall = parsed.messages && parsed.messages[0]?.content?.includes('trigger_external_tool');
 
       res.writeHead(200, {
@@ -55,7 +68,7 @@ const server = http.createServer((req, res) => {
                 // Second round: reply based on tool execution
                 res.write('data: {"choices": [{"delta": {"content": "Tool output synthesized."}}]}\n\n');
                 setTimeout(() => {
-                   res.write('data: {"choices": [{"finish_reason": "stop"}]}\n\n');
+                   res.write("data: {\"choices\": [{\"finish_reason\": \"stop\"}]}\\n\\n");
                    res.write('data: {"usage": {"prompt_tokens": 15, "completion_tokens": 10, "total_tokens": 25}}\n\n');
                    res.write("data: [DONE]\n\n");
                    res.end();
