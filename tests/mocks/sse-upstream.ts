@@ -2,6 +2,21 @@ const http = require('http');
 
 // A simple mock upstream server that simulates an OpenAI SSE stream
 const server = http.createServer((req, res) => {
+  if (req.method === 'POST' && req.url.includes('/embeddings')) {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      const parsed = JSON.parse(body);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        object: 'list',
+        data: [ { object: 'embedding', embedding: [0.1, 0.2, 0.3, 0.4], index: 0 } ],
+        model: parsed.model || 'text-embedding-ada-002',
+        usage: { prompt_tokens: 4, total_tokens: 4 }
+      }));
+    });
+    return;
+  }
   if (req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);

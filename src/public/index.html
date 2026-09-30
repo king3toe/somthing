@@ -72,7 +72,7 @@
         });
         if (res.ok) {
             document.getElementById('login-overlay').style.display = 'none';
-            loadProviders(); loadModels(); loadCombos();
+            loadProviders(); loadModels(); loadCombos(); loadTraces();
         } else {
             document.getElementById('login-error').style.display = 'block';
         }
@@ -114,6 +114,13 @@
         </button>
         <button onclick="switchTab('combos')" id="tab-combos" class="nav-item w-full flex items-center gap-3 px-4 py-3 mb-2 font-medium">
           <i data-lucide="git-merge" class="w-5 h-5"></i> <span data-i18n="nav.combos">Combos (MoA)</span>
+        </button>
+
+        <button onclick="switchTab('playground')" id="tab-playground" class="nav-item w-full flex items-center gap-3 px-4 py-3 mb-2 font-medium">
+          <i data-lucide="play-circle" class="w-5 h-5"></i> <span data-i18n="nav.playground">Playground</span>
+        </button>
+        <button onclick="switchTab('traces')" id="tab-traces" class="nav-item w-full flex items-center gap-3 px-4 py-3 mb-2 font-medium">
+          <i data-lucide="activity" class="w-5 h-5"></i> <span data-i18n="nav.traces">Trace Viewer</span>
         </button>
         <button onclick="switchTab('providers')" id="nav-providers" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-left" data-i18n="nav_providers">
         <i data-lucide="server" class="w-4 h-4"></i> Providers
@@ -343,12 +350,18 @@
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Primary Model</label>
-                  <input type="text" id="combo-primary" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="gpt-4o" required>
+                  <div>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Mode</label>
+                  <select id="combo-mode" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange">
+                    <option value="sequential">Sequential (Fallback)</option>
+                    <option value="parallel">Parallel (MoA)</option>
+                  </select>
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Fallback Model</label>
-                  <input type="text" id="combo-fallback" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="claude-3-opus" required>
+                  <label class="block text-xs font-semibold text-textMuted mb-2 uppercase tracking-wide">Models (comma separated)</label>
+                  <input type="text" id="combo-models" class="w-full bg-bgInput border border-borderDark text-textMain rounded-lg px-4 py-2.5 outline-none focus:border-accentOrange" placeholder="gpt-4o, claude-3-5-sonnet" required>
                 </div>
+              </div>
               </div>
               <button type="submit" class="bg-bgHover border border-borderDark hover:border-accentOrange text-white px-5 py-2.5 rounded-lg font-semibold transition-colors w-full mt-4">
                 Save Combo Config
@@ -809,13 +822,39 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ name, mode, models_json: JSON.stringify(models) })
        });
-       loadCombos();
+       loadCombos(); loadTraces();
     }
 
     async function resetBreaker(id) {
        await fetch('/api/providers/reset/' + id, { method: 'POST' });
-       loadProviders(); loadModels(); loadCombos();
+       loadProviders(); loadModels(); loadCombos(); loadTraces();
     }
+
+
+  async function loadTraces() {
+     const res = await fetch('/api/traces');
+     if (!res.ok) return;
+     const traces = await res.json();
+     const tbody = document.getElementById('traces-list');
+     if (!tbody) return;
+     tbody.innerHTML = '';
+     traces.forEach(t => {
+         const date = new Date(t.created_at).toLocaleTimeString();
+         const statusClass = t.status_code === 200 ? 'text-green-400' : 'text-red-400';
+         tbody.innerHTML += `
+            <tr class="hover:bg-bgHover transition-colors cursor-pointer">
+               <td class="px-6 py-4 whitespace-nowrap">${date}</td>
+               <td class="px-6 py-4 font-mono text-xs text-textMain truncate max-w-[150px]">${t.request_id}</td>
+               <td class="px-6 py-4">${t.model}</td>
+               <td class="px-6 py-4">${t.provider}</td>
+               <td class="px-6 py-4">${t.ttft_ms ? t.ttft_ms + 'ms' : '-'}</td>
+               <td class="px-6 py-4">${t.latency_ms}ms</td>
+               <td class="px-6 py-4">${t.cost_usd.toFixed(6)}</td>
+               <td class="px-6 py-4 ${statusClass} font-medium">${t.status_code}</td>
+            </tr>
+         `;
+     });
+  }
 
 async function loadProviders() {
       try {
@@ -853,7 +892,7 @@ async function loadProviders() {
           delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
           delBtn.onclick = async () => {
              await fetch('/api/providers/' + p.id, { method: 'DELETE' });
-             loadProviders(); loadModels(); loadCombos();
+             loadProviders(); loadModels(); loadCombos(); loadTraces();
           };
 
           const icon = document.createElement('i');
@@ -886,7 +925,7 @@ async function loadProviders() {
       });
       alert('Provider saved successfully!');
       e.target.reset();
-      loadProviders(); loadModels(); loadCombos();
+      loadProviders(); loadModels(); loadCombos(); loadTraces();
     }
 
     async function loadTools() {
@@ -986,7 +1025,7 @@ async function loadProviders() {
           delBtn.className = 'bg-bgHover border border-borderDark p-2 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition';
           delBtn.onclick = async () => {
              await fetch('/api/combos/' + c.id, { method: 'DELETE' });
-             loadCombos();
+             loadCombos(); loadTraces();
           };
 
           const icon = document.createElement('i');
@@ -1012,13 +1051,13 @@ async function loadProviders() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           name: document.getElementById('combo-name').value,
-          primary_model: document.getElementById('combo-primary').value,
-          fallback_model: document.getElementById('combo-fallback').value,
+          mode: document.getElementById('combo-mode').value,
+          models_json: JSON.stringify(document.getElementById('combo-models').value.split(',').map(s => s.trim())),
         })
       });
       alert('Combo saved successfully!');
       e.target.reset();
-      loadCombos();
+      loadCombos(); loadTraces();
     }
 
     async function loadMedia() {
@@ -1358,9 +1397,9 @@ async function loadProviders() {
     loadUsage();
     loadQuotas();
     loadConfigs();
-    loadProviders(); loadModels(); loadCombos();
+    loadProviders(); loadModels(); loadCombos(); loadTraces();
     loadTools();
-    loadCombos();
+    loadCombos(); loadTraces();
     loadMedia();
 
     // Load saved language
@@ -1427,7 +1466,7 @@ async function loadProviders() {
         if (res.ok) {
             document.getElementById('login-overlay').style.display = 'none';
             // Reload dashboard data
-            loadProviders(); loadModels(); loadCombos();
+            loadProviders(); loadModels(); loadCombos(); loadTraces();
         } else {
             document.getElementById('login-error').style.display = 'block';
         }
@@ -1443,6 +1482,35 @@ async function loadProviders() {
         return res;
     };
   </script>
+
+
+
+
+
+
+
+<script>
+    function enforceAuth() {
+      const token = localStorage.getItem('everyroute_admin');
+      if (!token) {
+         const modal = document.getElementById('login-modal');
+         if (modal) modal.classList.remove('hidden');
+      }
+    }
+    async function attemptLogin() {
+      const p = document.getElementById('admin-password').value;
+      const res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:p})});
+      if (res.ok) {
+         const data = await res.json();
+         localStorage.setItem('everyroute_admin', data.token);
+         document.getElementById('login-modal').classList.add('hidden');
+         window.location.reload();
+      } else {
+         alert('Invalid login');
+      }
+    }
+    enforceAuth();
+</script>
 
 </body>
 </html>

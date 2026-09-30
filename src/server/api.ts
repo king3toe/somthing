@@ -139,6 +139,11 @@ export default async function apiRoutes(fastify: FastifyInstance) {
     return db.prepare('SELECT * FROM Combos').all();
   });
 
+  // === TRACES ===
+  fastify.get('/api/traces', async () => {
+    return db.prepare('SELECT * FROM Traces ORDER BY created_at DESC LIMIT 100').all();
+  });
+
   // === REGISTRY ===
   fastify.get('/api/registry', async () => {
     return db.prepare('SELECT * FROM ModelRegistry').all();
@@ -152,7 +157,7 @@ export default async function apiRoutes(fastify: FastifyInstance) {
   fastify.get('/api/quotas', async () => {
     // Get aggregated cost per Unified Key
     const costs = db.prepare('SELECT unified_key_id, SUM(cost_usd) as used_usd FROM CostTracking GROUP BY unified_key_id').all() as any[];
-    const keys = db.prepare('SELECT id, name FROM UnifiedKeys').all() as any[];
+    const keys = db.prepare('SELECT id, name, spend_limit_usd FROM UnifiedKeys').all() as any[];
 
     return keys.map(k => {
       const usageRec = costs.find(c => c.unified_key_id === k.id);
@@ -160,8 +165,7 @@ export default async function apiRoutes(fastify: FastifyInstance) {
         id: k.id,
         name: k.name,
         used_usd: usageRec ? usageRec.used_usd : 0,
-        // In a real app, this limit would be stored in the DB. We default to $10 for the UI demo.
-        limit_usd: 10.00
+        limit_usd: k.spend_limit_usd || 10.00
       };
     });
   });

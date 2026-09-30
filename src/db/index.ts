@@ -32,6 +32,9 @@ export const initDb = () => {
   runMigration(2, '002_streaming_metrics.sql');
   runMigration(3, '003_registry.sql');
   runMigration(4, '004_combos.sql');
+  runMigration(5, '005_traces.sql');
+  runMigration(6, '006_scopes.sql');
+  runMigration(7, '007_caching.sql');
 
   const count = db.prepare('SELECT count(*) as c FROM schema_version').get() as {c: number};
   if (count.c > 0) {

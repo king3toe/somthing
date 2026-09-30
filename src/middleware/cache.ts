@@ -16,6 +16,8 @@ export const generateCacheHash = (body: any): string => {
     model: body.model,
     messages: normalizeMessages(body.messages),
     tools: body.tools ? JSON.stringify(body.tools) : undefined,
+    input: typeof body.input === 'string' ? body.input.trim().toLowerCase() : body.input,
+    prompt: typeof body.prompt === 'string' ? body.prompt.trim().toLowerCase() : body.prompt,
   };
   return crypto.createHash('sha256').update(JSON.stringify(cacheableBody)).digest('hex');
 };

@@ -1,3 +1,4 @@
+import db from '../db';
 export type BreakerState = 'CLOSED' | 'OPEN' | 'PROBING';
 
 export interface CircuitBreakerState {
@@ -10,9 +11,27 @@ export interface CircuitBreakerState {
 // In-Memory global breaker state
 const registry = new Map<number, CircuitBreakerState>();
 
+let initialized = false;
+
 export function getBreaker(providerId: number): CircuitBreakerState {
+   if (!initialized) {
+       initialized = true;
+       try {
+           const keys = db.prepare('SELECT id, is_active FROM ProviderKeys').all() as any[];
+           for (const k of keys) {
+               if (k.is_active === 0) {
+                   registry.set(k.id, { state: 'OPEN', retryAfter: Date.now() + 999999999, currentBackoff: 999999999, disabled: true });
+               }
+           }
+       } catch(e) {}
+   }
    if (!registry.has(providerId)) {
-       registry.set(providerId, { state: 'CLOSED', retryAfter: 0, currentBackoff: 0, disabled: false });
+       const k = db.prepare('SELECT is_active FROM ProviderKeys WHERE id = ?').get(providerId) as any;
+       if (k && k.is_active === 0) {
+           registry.set(providerId, { state: 'OPEN', retryAfter: Date.now() + 999999999, currentBackoff: 999999999, disabled: true });
+       } else {
+           registry.set(providerId, { state: 'CLOSED', retryAfter: 0, currentBackoff: 0, disabled: false });
+       }
    }
    return registry.get(providerId)!;
 }
