@@ -1,0 +1,40 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "start": "tsc && node dist/server/index.js",
+    "dev": "ts-node src/server/index.js",
+    "test": "tsc && NODE_ENV=test node tests/streaming/streaming.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/king3toe/somthing.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/static": "^7.0.4",
+    "axios": "^1.7.7",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "eventsource-parser": "^4.1.1",
+    "fastify": "^4.28.1",
+    "ipaddr.js": "^2.5.0",
+    "jsonwebtoken": "^9.0.3",
+    "open": "^10.1.0",
+    "tiktoken": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.5.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}
