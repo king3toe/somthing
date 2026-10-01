@@ -7,8 +7,7 @@ const resolve6 = promisify(dns.resolve6);
 
 export async function resolveAndCheckIP(hostname: string): Promise<string> {
    if (ipaddr.isValid(hostname)) {
-      // Always enforce private IP logic, tests should mock upstream correctly or we mock around it safely in testing.
-      if (isPrivateIP(hostname) && hostname !== '127.0.0.1') throw new Error(`SSRF blocked: ${hostname}`); // 127 allowed only to hit mock upstream
+            if (isPrivateIP(hostname)) throw new Error(`SSRF blocked: ${hostname}`);
       return hostname;
    }
 

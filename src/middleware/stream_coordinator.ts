@@ -216,7 +216,7 @@ export async function* runComboStream(
       const registry = routerDeps.db.prepare('SELECT provider FROM ModelRegistry WHERE model_id = ?').get(modelId);
       const providerStr = registry?.provider || 'openai'; // default to openai compatible
 
-      const available = keys.filter(k => (k.provider_name.toLowerCase() === providerStr.toLowerCase() || k.provider_name.toLowerCase() === 'mock_openai') && (!k.rate_limit_until || new Date(k.rate_limit_until).getTime() < Date.now()));
+      const available = keys.filter(k => k.provider_name.toLowerCase() === providerStr.toLowerCase() && (!k.rate_limit_until || new Date(k.rate_limit_until).getTime() < Date.now()));
       if (available.length === 0) throw new Error(`No keys available for ${modelId} (provider ${providerStr})`);
 
       const p = available[0];

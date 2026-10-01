@@ -22,7 +22,7 @@ function getBestProviderKey(modelId: string, estimatedTokens: number) {
    const providerStr = registry?.provider || 'openai';
 
    for (const k of keys) {
-      if (k.provider_name.toLowerCase() !== providerStr.toLowerCase() && !k.provider_name.toLowerCase().startsWith('mock_')) continue;
+      if (k.provider_name.toLowerCase() !== providerStr.toLowerCase()) continue;
       if (canUseKey(k.id)) {
          availableKeys.push(k);
       }
@@ -334,7 +334,7 @@ export default async function router(fastify: FastifyInstance) {
           }));
        } else {
           const runtimeProvider = { ...selectedProvider, api_key: decryptKey(selectedProvider.api_key) };
-          const adapterFn = () => (selectedProvider.provider_name.toLowerCase() === 'anthropic' || selectedProvider.provider_name.toLowerCase() === 'mock_anthropic')
+          const adapterFn = () => selectedProvider.provider_name.toLowerCase() === 'anthropic'
              ? streamAnthropic(runtimeProvider, ctx)
              : streamOpenAI(runtimeProvider, ctx);
           events = withErrorPolicy(runAgentStream(adapterFn, ctx, metricsCallback));
@@ -344,7 +344,7 @@ export default async function router(fastify: FastifyInstance) {
        streamEvents.on('error', () => {});
        return reply.send(streamEvents);
     } else {
-       return reply.status(400).send({ error: "Non-streaming is not fully implemented in this phase mock." });
+       return reply.status(400).send({ error: "Non-streaming endpoints are not yet supported for chat completions." });
     }
   });
 }
