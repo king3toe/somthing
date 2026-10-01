@@ -28,7 +28,11 @@ export async function* streamAnthropic(
     messages,
     system: system || undefined,
     stream: true,
-    // TODO: translate tools if present
+    tools: req.tools ? req.tools.map((t: any) => ({
+      name: t.function.name,
+      description: t.function.description,
+      input_schema: t.function.parameters
+    })) : undefined,
   };
 
   const response = await fetch(url, {
