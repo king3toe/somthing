@@ -35,12 +35,16 @@ export const initDb = () => {
   runMigration(5, '005_traces.sql');
   runMigration(6, '006_scopes.sql');
   runMigration(7, '007_caching.sql');
+  runMigration(8, '008_memory.sql');
 
   const count = db.prepare('SELECT count(*) as c FROM schema_version').get() as {c: number};
   if (count.c > 0) {
       const toolCount = db.prepare('SELECT count(*) as c FROM ToolConfigs').get() as {c: number};
       if (toolCount.c === 0) {
-         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('fetch_url', '', '');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('scrape_and_extract', '', '');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('execute_python', '', 'local');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('save_memory', '', 'local');
+         db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('search_memory', '', 'local');
          db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('get_weather', '', 'https://api.openweathermap.org/data/2.5/weather');
          db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('search_youtube', '', 'https://www.googleapis.com/youtube/v3');
          db.prepare('INSERT INTO ToolConfigs (tool_name, api_key, base_url) VALUES (?, ?, ?)').run('web_search', '', 'https://google.serper.dev/search');

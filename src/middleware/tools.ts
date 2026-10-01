@@ -3,7 +3,45 @@ import axios from 'axios';
 import db from '../db';
 
 // Registry of well-known tools and their precise JSON schemas for LLMs
+import { execSync } from 'child_process';
+import crypto from 'crypto';
+import path from 'path';
+
 export const PredefinedToolSchemas: Record<string, any> = {
+  save_memory: {
+    name: "save_memory",
+    description: "Saves a piece of information, preference, or fact into long-term memory for later retrieval.",
+    parameters: {
+      type: "object",
+      properties: {
+        key: { type: "string", description: "A unique, short identifier or topic for this memory (e.g. 'user_name', 'favorite_color')" },
+        value: { type: "string", description: "The detailed fact to remember." }
+      },
+      required: ["key", "value"]
+    }
+  },
+  search_memory: {
+    name: "search_memory",
+    description: "Searches the long-term memory store by key.",
+    parameters: {
+      type: "object",
+      properties: {
+        key: { type: "string", description: "The exact key or a keyword prefix to search for." }
+      },
+      required: ["key"]
+    }
+  },
+  execute_python: {
+    name: "execute_python",
+    description: "Executes Python code in a sandboxed environment and returns the standard output. Useful for math, data analysis, or logic tasks.",
+    parameters: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "The Python script to execute. Must use print() to output results." }
+      },
+      required: ["code"]
+    }
+  },
   get_weather: {
     name: "get_weather",
     description: "Get the current weather for a specific location.",
@@ -37,13 +75,13 @@ export const PredefinedToolSchemas: Record<string, any> = {
       required: ["query"]
     }
   },
-  fetch_url: {
-    name: "fetch_url",
-    description: "Fetch the raw text content of a specific webpage URL.",
+  scrape_and_extract: {
+    name: "scrape_and_extract",
+    description: "Fetch and extract clean text from a webpage URL. Great for reading articles, docs, or web search results.",
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The full URL of the webpage to fetch" }
+        url: { type: "string", description: "The full URL of the webpage to scrape" }
       },
       required: ["url"]
     }
@@ -92,16 +130,51 @@ export const resolveToolCall = async (toolCall: any) => {
       });
       return JSON.stringify(result.data.organic?.map((o: any) => ({ title: o.title, link: o.link, snippet: o.snippet })) || result.data);
     }
-    else if (toolName === 'fetch_url') {
-      const r = await safeFetch((args as any).url);
-      result = { data: await r.text() };
-      // extremely basic text extraction for demo purposes
-      const html = result.data;
-      const text = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '')
-                       .replace(/<\/?\w(?:[^"'>]|"[^"]*"|'[^']*')*>/gmi, '')
-                       .replace(/\s+/g, ' ')
-                       .trim().substring(0, 5000); // truncate to avoid blowing up context
-      return JSON.stringify({ content: text });
+    else if (toolName === 'scrape_and_extract') {
+      const targetUrl = (args as any).url;
+      if (!targetUrl) return JSON.stringify({ error: 'Missing URL' });
+      // To improve scraping, we fetch with common headers
+      const r = await safeFetch(targetUrl, {
+         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+      });
+      const html = await r.text();
+      // Remove scripts, styles, head, svgs
+      const clean = html.replace(/<(script|style|head|svg|nav|footer)[^>]*>[\s\S]*?<\/\1>/gi, '')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim().substring(0, 15000); // 15k chars is about ~3.5k tokens
+      return JSON.stringify({ source: targetUrl, content: clean });
+    }
+    else if (toolName === 'save_memory') {
+      const key = (args as any).key;
+      const value = (args as any).value;
+      if (!key || !value) return JSON.stringify({ error: 'Missing key or value' });
+      db.prepare(`
+        INSERT INTO AgentMemory (memory_key, memory_value)
+        VALUES (?, ?)
+        ON CONFLICT(memory_key) DO UPDATE SET memory_value=excluded.memory_value, updated_at=CURRENT_TIMESTAMP
+      `).run(key, value);
+      return JSON.stringify({ success: true, message: `Saved '${value}' under '${key}'` });
+    }
+    else if (toolName === 'search_memory') {
+      const key = (args as any).key || '';
+      const rows = db.prepare('SELECT memory_key, memory_value FROM AgentMemory WHERE memory_key LIKE ? LIMIT 10').all(`%${key}%`);
+      return JSON.stringify({ results: rows });
+    }
+    else if (toolName === 'execute_python') {
+      const scriptCode = (args as any).code || '';
+      const tmpFile = path.join('/tmp', `script_${crypto.randomUUID()}.py`);
+      require('fs').writeFileSync(tmpFile, scriptCode);
+      try {
+        // Run with a 10-second timeout to prevent infinite loops
+        const stdout = execSync(`python3 ${tmpFile}`, { timeout: 10000, encoding: 'utf8' });
+        result = { stdout: stdout.trim() };
+      } catch (err: any) {
+        result = { error: err.stderr ? err.stderr.toString() : err.message };
+      } finally {
+        try { require('fs').unlinkSync(tmpFile); } catch(e){}
+      }
+      return JSON.stringify(result);
     }
     else {
       // General Generic API handler
