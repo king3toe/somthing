@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+data/
+*.db
+*.db-shm
+*.db-wal
+server.log
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/.master.key

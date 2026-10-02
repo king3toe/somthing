@@ -1,0 +1,104 @@
+
+> app@1.0.0 test
+> tsc && NODE_ENV=test node tests/streaming/streaming.test.ts
+
+PRAGMA journal_mode = WAL
+PRAGMA synchronous = NORMAL
+CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+SELECT version FROM schema_version WHERE version = 1.0
+SELECT version FROM schema_version WHERE version = 2.0
+SELECT version FROM schema_version WHERE version = 3.0
+SELECT version FROM schema_version WHERE version = 4.0
+SELECT count(*) as c FROM schema_version
+SELECT count(*) as c FROM ToolConfigs
+
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('gpt-4o', 'openai', 1.0, 1.0, 1.0, 128000.0, 4096.0, 5.0, 15.0, 2.5)
+
+
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('gpt-4o-mini', 'openai', 1.0, 1.0, 1.0, 128000.0, 16384.0, 0.15, 0.6, 0.075)
+
+
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('claude-3-5-sonnet-20240620', 'anthropic', 1.0, 1.0, 1.0, 200000.0, 8192.0, 3.0, 15.0, 0.3)
+
+Database initialized and migrated.
+DELETE FROM ProviderKeys
+DELETE FROM Combos
+INSERT INTO ProviderKeys (provider_name, api_key, base_url, weight, is_active) VALUES ('mock_openai', 'enc:96619887e48788deaf61ab10:32c'/*+46 bytes*/, 'http://127.0.0.1:4000', 1.0, 1.0)
+Mock: Mock upstream listening on 4000
+
+Router: PRAGMA journal_mode = WAL
+
+Router: PRAGMA synchronous = NORMAL
+
+Router: CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Router: SELECT version FROM schema_version WHERE version = 1.0
+SELECT version FROM schema_version WHERE version = 2.0
+
+Router: SELECT version FROM schema_version WHERE version = 3.0
+SELECT version FROM schema_version WHERE version = 4.0
+
+Router: SELECT count(*) as c FROM schema_version
+
+Router: SELECT count(*) as c FROM ToolConfigs
+
+Router:
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('gpt-4o', 'openai', 1.0, 1.0, 1.0, 128000.0, 4096.0, 5.0, 15.0, 2.5)
+
+
+Router:
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('gpt-4o-mini', 'openai', 1.0, 1.0, 1.0, 128000.0, 16384.0, 0.15, 0.6, 0.075)
+
+
+        INSERT OR IGNORE INTO ModelRegistry
+        (model_id, provider, vision, tools, json_mode, ctx_window, max_output, cost_input_1m, cost_output_1m, cost_cache_read_1m)
+        VALUES ('claude-3-5-sonnet-20240620', 'anthropic', 1.0, 1.0, 1.0, 200000.0, 8192.0, 3.0, 15.0, 0.3)
+
+Database initialized and migrated.
+
+Router: SELECT config_value FROM SystemConfigs WHERE config_key = 'admin_password_hash'
+
+Router: {"level":50,"time":1790616257126,"pid":1647014,"hostname":"devbox","err":{"type":"Error","message":"listen EADDRINUSE: address already in use 127.0.0.1:3000","stack":"Error: listen EADDRINUSE: address already in use 127.0.0.1:3000\n    at Server.setupListenHandle [as _listen2] (node:net:1940:16)\n    at listenInCluster (node:net:1997:12)\n    at node:net:2206:7\n    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"127.0.0.1","port":3000},"msg":"listen EADDRINUSE: address already in use 127.0.0.1:3000"}
+
+=== PHASE 1 STREAMING TESTS ===
+Test 1: TTFT
+-> Pass (Test 1 & 9)
+Test 5: Internal Tool Calls (No intermediate DONE)
+-> Pass
+Test 6: External Tools (Yields to client)
+-> Pass
+Test 8: Client Disconnect Abort
+SELECT error_count FROM ProviderKeys WHERE provider_name = 'mock_openai'
+SELECT error_count FROM ProviderKeys WHERE provider_name = 'mock_openai'
+-> Pass
+
+=== PHASE 2 BRAINS TESTS ===
+Testing Pre-flight Tiktoken Counting...
+-> Pass
+Testing Auto-Routing (Vision Strip Policy)...
+-> Pass (Auto-routed successfully based on estimated capability & cost)
+Testing Circuit Breaker Half-Open...
+UPDATE ProviderKeys SET is_active = 0 WHERE provider_name = 'mock_openai'
+UPDATE ProviderKeys SET is_active = 1 WHERE provider_name = 'mock_openai'
+-> Pass
+Testing Combos...
+INSERT INTO Combos (name, mode, models_json) VALUES ('test-combo', 'sequential', '["gpt-4o", "gpt-4o"]')
+-> Pass
+
+ALL TESTS PASS.
