@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/server/index.js",
+  "bin": {
+    "everyroute": "./dist/server/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server/index.js",

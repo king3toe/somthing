@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import fastifyCookie from '@fastify/cookie';
 import Fastify from 'fastify';
 import dotenv from 'dotenv';
